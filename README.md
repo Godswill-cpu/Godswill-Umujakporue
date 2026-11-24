@@ -18,8 +18,12 @@ with captions, runs quality control and — only after your approval — exports
 - Azure AI Speech resource (key + region) for production narration
 
 ## Install
-**Easiest:** macOS/Linux `./install.sh` then `./start.sh`; Windows: right-click `install.ps1` → *Run with PowerShell*,
-then double-click `start.bat`. The browser opens at http://127.0.0.1:8765.
+**Easiest:**
+- **Windows:** install Python 3.11+ from python.org (tick *Add python.exe to PATH*), then double-click **`install.bat`**
+  (it installs FFmpeg with winget if missing). Afterwards double-click **`start.bat`**.
+- **macOS/Linux:** `./install.sh`, then `./start.sh`.
+
+The browser opens at http://127.0.0.1:8765. If the Windows installer fails, its window stays open with the reason.
 
 Manual install:
 ```bash
