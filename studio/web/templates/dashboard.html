@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Dashboard{% endblock %}{% block body %}
+<h1>Dashboard</h1>
+<div class="grid" style="margin-bottom:18px">
+ <div class="stat"><span class="muted small">Active</span><b>{{ counts['running'] + counts['in progress'] + counts['new'] }}</b></div>
+ <div class="stat"><span class="muted small">Ready for review</span><b>{{ counts['ready for review'] }}</b></div>
+ <div class="stat"><span class="muted small">Approved</span><b>{{ counts['approved'] }}</b></div>
+ <div class="stat"><span class="muted small">Failed</span><b style="color:var(--bad)">{{ counts['failed'] }}</b></div>
+</div>
+<div class="card"><h2>Projects</h2>
+{% if not projects %}<p class="muted">No projects yet. <a href="/create">Create your first tutorial</a>.</p>{% else %}
+<div class="table-wrap"><table><tr><th>Tutorial</th><th>Status</th><th>Pipeline</th><th>Created</th></tr>
+{% for p in projects %}<tr><td><a href="/projects/{{ p.id }}">{{ p.title }}</a><div class="muted small">{{ p.request.workflow_id }}</div></td>
+<td><span class="pill s-{{ p.status.replace(' ','.') }}">{{ p.status }}</span></td>
+<td class="small">{% for s in stages %}<span class="pill s-{{ p.stages[s].status }}" title="{{ p.stages[s].error or '' }}">{{ s }}</span> {% endfor %}</td>
+<td class="small muted">{{ p.created_at[:16].replace('T',' ') }}</td></tr>{% endfor %}</table></div>{% endif %}</div>
+<div class="card"><h2>Recent outputs</h2>{% if not recent %}<p class="muted">No rendered videos yet.</p>{% endif %}
+{% for p in recent %}<div><a href="/projects/{{ p.id }}#review">{{ p.title }}</a> <span class="muted small">{{ p.state.render.resolution }}, {{ p.state.render.duration|mmss }}
+{% if p.state.render.dev_watermark %}<span class="pill s-warning">dev voice</span>{% endif %}</span></div>{% endfor %}</div>
+{% endblock %}

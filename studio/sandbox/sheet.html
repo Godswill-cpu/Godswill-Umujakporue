@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="app-name" content="Studio Sandbox Sheet">
+<meta name="app-version" content="1.0.0">
+<meta name="app-build" content="2026.11.1">
+<meta name="app-edition" content="Bundled test environment">
+<title>Customer list - Studio Sandbox Sheet</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 "Inter", "DejaVu Sans", Arial, sans-serif; color: #1f2937; background: #f3f4f6; }
+  header { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: #fff; border-bottom: 1px solid #e5e7eb; }
+  .logo { width: 32px; height: 32px; border-radius: 6px; background: #0f9d58; color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .doc-title { font-size: 18px; font-weight: 600; }
+  .menubar { display: flex; gap: 2px; padding: 4px 14px; background: #fff; border-bottom: 1px solid #e5e7eb; position: relative; }
+  .menu { position: relative; }
+  .menu > button { background: none; border: 0; padding: 6px 12px; font: inherit; border-radius: 4px; cursor: pointer; }
+  .menu > button:hover, .menu.open > button { background: #e8f0fe; }
+  .dropdown { display: none; position: absolute; top: 34px; left: 0; min-width: 230px; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px 0; z-index: 10; }
+  .menu.open .dropdown { display: block; }
+  .dropdown button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 16px; font: inherit; cursor: pointer; }
+  .dropdown button:hover { background: #f3f4f6; }
+  .dropdown button[disabled] { color: #9ca3af; cursor: default; }
+  main { padding: 18px; }
+  .sheet { background: #fff; border: 1px solid #d1d5db; border-collapse: collapse; }
+  .sheet th, .sheet td { border: 1px solid #e5e7eb; padding: 7px 14px; min-width: 70px; }
+  .sheet thead th { background: #f9fafb; color: #6b7280; font-weight: 500; text-align: center; }
+  .sheet tbody th { background: #f9fafb; color: #6b7280; font-weight: 500; width: 44px; text-align: center; }
+  .sheet td.hdr { font-weight: 600; }
+  .sheet.selected td { background: #e8f0fe; }
+  #select-all { cursor: pointer; }
+  .status { margin-top: 12px; color: #6b7280; }
+  .backdrop { display: none; position: fixed; inset: 0; background: rgba(17,24,39,.35); }
+  .backdrop.show { display: grid; place-items: center; }
+  .dialog { width: 420px; background: #fff; border-radius: 10px; padding: 22px 24px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+  .dialog h2 { margin: 0 0 6px; font-size: 19px; }
+  .dialog p { margin: 0 0 14px; color: #4b5563; }
+  .dialog label { display: flex; gap: 10px; align-items: center; padding: 5px 0; }
+  .dialog input[type=checkbox] { width: 18px; height: 18px; }
+  .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; font: inherit; cursor: pointer; }
+  .btn.primary { background: #0f9d58; border-color: #0f9d58; color: #fff; }
+  .cols { border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header><div class="logo">S</div><div class="doc-title">Customer list</div></header>
+<nav class="menubar">
+  <div class="menu"><button>File</button></div>
+  <div class="menu"><button>Edit</button></div>
+  <div class="menu" id="menu-data"><button id="data-menu">Data</button>
+    <div class="dropdown">
+      <button id="menu-sort" disabled>Sort range</button>
+      <button id="menu-remove-duplicates">Remove duplicates</button>
+    </div>
+  </div>
+  <div class="menu"><button>Help</button></div>
+</nav>
+<main>
+  <table class="sheet" id="sheet">
+    <thead><tr><th id="select-all" title="Select all">&#9698;</th><th>A</th><th>B</th><th>C</th><th>D</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="status" id="status"></div>
+</main>
+
+<div class="backdrop" id="dlg-remove">
+  <div class="dialog" role="dialog" aria-labelledby="dlg-title">
+    <h2 id="dlg-title">Remove duplicates</h2>
+    <p id="dlg-range">Selected range</p>
+    <label><input type="checkbox" id="has-header" checked> Data has header row</label>
+    <div class="cols" id="dlg-cols"></div>
+    <div class="actions">
+      <button class="btn" id="dlg-cancel">Cancel</button>
+      <button class="btn primary" id="dlg-confirm">Remove duplicates</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="dlg-result">
+  <div class="dialog" role="alertdialog">
+    <h2>Duplicates removed</h2>
+    <p id="result-text"></p>
+    <div class="actions"><button class="btn primary" id="result-ok">OK</button></div>
+  </div>
+</div>
+
+<script>
+// Synthetic, non-personal sample data (fictional names; example.com domain).
+const INITIAL = [
+  ["Customer", "Email", "City", "Plan"],
+  ["Ada Brightwater", "ada@example.com", "Leeds", "Pro"],
+  ["Ben Okafor", "ben@example.com", "Lagos", "Basic"],
+  ["Chen Liu", "chen@example.com", "Toronto", "Pro"],
+  ["Ben Okafor", "ben@example.com", "Lagos", "Basic"],
+  ["Dana Ruiz", "dana@example.com", "Madrid", "Team"],
+  ["Ada Brightwater", "ada@example.com", "Leeds", "Pro"],
+  ["Eli Novak", "eli@example.com", "Prague", "Basic"],
+  ["Fay Mensah", "fay@example.com", "Accra", "Team"],
+  ["Chen Liu", "chen@example.com", "Toronto", "Pro"],
+  ["Gus Varga", "gus@example.com", "Budapest", "Basic"],
+];
+let data = INITIAL.map(r => r.slice());
+let selected = false;
+const $ = id => document.getElementById(id);
+
+function render() {
+  const body = $("rows");
+  body.innerHTML = "";
+  data.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<th>${i + 1}</th>` + row.map(c => `<td class="${i === 0 ? "hdr" : ""}">${c}</td>`).join("");
+    body.appendChild(tr);
+  });
+  $("status").textContent = `${data.length - 1} data rows`;
+  $("sheet").classList.toggle("selected", selected);
+}
+
+$("select-all").onclick = () => { selected = true; render(); $("status").textContent = `Selected A1:D${data.length}`; };
+$("data-menu").onclick = (e) => { e.stopPropagation(); $("menu-data").classList.toggle("open"); };
+document.addEventListener("click", () => $("menu-data").classList.remove("open"));
+$("menu-remove-duplicates").onclick = () => {
+  $("menu-data").classList.remove("open");
+  if (!selected) { $("status").textContent = "Select a range first"; return; }
+  $("dlg-range").textContent = `Range A1:D${data.length} — compare these columns:`;
+  $("dlg-cols").innerHTML = data[0].map((h, i) => `<label><input type="checkbox" class="col" data-col="${i}" checked> Column ${"ABCD"[i]} – ${h}</label>`).join("");
+  $("dlg-remove").classList.add("show");
+};
+$("dlg-cancel").onclick = () => $("dlg-remove").classList.remove("show");
+$("dlg-confirm").onclick = () => {
+  const header = $("has-header").checked;
+  const cols = [...document.querySelectorAll(".col")].filter(c => c.checked).map(c => +c.dataset.col);
+  const head = header ? [data[0]] : [];
+  const rows = header ? data.slice(1) : data;
+  const seen = new Set(); const kept = [];
+  for (const r of rows) { const k = JSON.stringify(cols.map(i => r[i])); if (!seen.has(k)) { seen.add(k); kept.push(r); } }
+  const removed = rows.length - kept.length;
+  data = head.concat(kept);
+  $("dlg-remove").classList.remove("show");
+  $("result-text").textContent = `${removed} duplicate rows found and removed. ${kept.length} unique rows remain.`;
+  $("dlg-result").classList.add("show");
+  render();
+};
+$("result-ok").onclick = () => $("dlg-result").classList.remove("show");
+
+window.sandboxSheet = {
+  version: document.querySelector('meta[name="app-version"]').content,
+  build: document.querySelector('meta[name="app-build"]').content,
+  getRows: () => data.map(r => r.slice()),
+};
+render();
+</script>
+</body>
+</html>

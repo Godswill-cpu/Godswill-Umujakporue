@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% block title %}{{ p.title }}{% endblock %}{% block body %}
+<h1>{{ p.title }} <span class="pill s-{{ p.status.replace(' ','.') }}" id="proj-status">{{ p.status }}</span></h1>
+<div class="toc"><a href="#pipeline">Pipeline</a><a href="#planning">Research & planning</a><a href="#demo">Demonstration</a><a href="#script">Script editor</a>
+<a href="#voice">Voice studio</a><a href="#review">Video review</a><a href="#qc">Quality control</a><a href="#publishing">Publishing</a><a href="#log">Log</a></div>
+
+<section class="card" id="pipeline"><h2>Pipeline</h2>
+<table><tr><th>Stage</th><th>Status</th><th>Detail</th><th></th></tr>
+{% for s in stages %}{% set st = p.stages[s] %}<tr><td>{{ stage_labels[s] }}</td><td><span class="pill s-{{ st.status }}" data-stage="{{ s }}">{{ st.status }}</span></td>
+<td class="small">{% if st.error %}<span style="color:var(--bad)">{{ st.error }}</span>{% elif st.finished_at %}<span class="muted">{{ st.finished_at[11:19] }} UTC</span>{% endif %}</td>
+<td><form class="inline" method="post" action="/projects/{{ p.id }}/run"><input type="hidden" name="from_stage" value="{{ s }}">
+<button {{ 'disabled' if running }} title="Re-run this stage and everything after it">Run from here</button></form></td></tr>{% endfor %}</table>
+<form method="post" action="/projects/{{ p.id }}/run" style="margin-top:12px"><button class="primary" {{ 'disabled' if running }}>{{ 'Running…' if running else 'Run / resume pipeline' }}</button></form>
+</section>
+
+<section class="card" id="planning"><h2>Research & planning</h2>
+{% if plan %}<p>{{ plan.summary }}</p><div class="notice warn small">{{ plan.research_note }}</div>
+{% for w in plan.warnings %}<div class="notice warn small">{{ w }}</div>{% endfor %}
+<h3>Prerequisites</h3><ul>{% for x in plan.prerequisites %}<li>{{ x }}</li>{% endfor %}</ul>
+<h3>Outline</h3><table><tr><th>#</th><th>Step</th><th>Expected outcome</th><th>Sources</th><th>Status</th></tr>
+{% for s in plan.steps %}<tr><td>{{ loop.index }}</td><td>{{ s.title }}</td><td class="small">{{ s.expected }}</td><td class="small">{{ s.source_ids|join(', ') }}</td>
+<td><span class="pill s-{{ s.status }}">{{ s.status }}</span></td></tr>{% endfor %}</table>
+<h3>Sources</h3><ul class="small">{% for s in plan.sources %}<li><b>{{ s.id }}</b>: {{ s.title }} ({{ s.kind }}) {{ s.url }} — {{ s.note }}</li>{% endfor %}</ul>
+{% else %}<p class="muted">Not planned yet.</p>{% endif %}</section>
+
+<section class="card" id="demo"><h2>Demonstration manager</h2>
+<p class="small muted">Workflow <b>{{ workflow.id }}</b> · verification rule: {{ workflow.verification }}</p>
+{% if execution %}{% set v = execution.verification %}
+<div class="notice {{ 'ok' if v.outcome=='passed' else 'bad' }}">Verification <b>{{ v.outcome.upper() }}</b> at {{ v.verified_at }} (run {{ execution.run_id }})</div>
+<h3>Environment record</h3><table class="small">
+<tr><th>Application</th><td>{{ v.environment.app_name }}</td><th>Edition</th><td>{{ v.environment.app_edition or 'unknown' }}</td></tr>
+<tr><th>Version</th><td>{{ v.environment.app_version or 'UNKNOWN' }}</td><th>Build</th><td>{{ v.environment.app_build or 'unknown' }}</td></tr>
+<tr><th>OS</th><td>{{ v.environment.os }}</td><th>Platform</th><td>{{ v.environment.platform }}</td></tr>
+<tr><th>Browser</th><td>{{ v.environment.browser_name }} {{ v.environment.browser_version }}</td><th>Tested</th><td>{{ v.environment.tested_at }}</td></tr>
+<tr><th>Observed UI</th><td colspan="3">{{ v.environment.observed_ui_state }}</td></tr></table>
+{% for w in v.compatibility_warnings %}<div class="notice warn small">{{ w }}</div>{% endfor %}
+<h3>Verification checks</h3><table class="small">{% for c in v.checks %}<tr><td><span class="pill s-{{ 'passed' if c.passed else 'failed' }}">{{ 'pass' if c.passed else 'fail' }}</span></td><td>{{ c.name }}</td><td class="muted">{{ c.detail }}</td></tr>{% endfor %}</table>
+<h3>Steps</h3><table class="small"><tr><th>Step</th><th>Status</th><th>Time in recording</th><th>Result</th></tr>
+{% for s in execution.steps %}<tr><td>{{ s.title }}</td><td><span class="pill s-{{ s.status }}">{{ s.status }}</span></td><td>{{ '%.1f'|format(s.t_start) }}–{{ '%.1f'|format(s.t_end) }}s</td><td>{{ s.message }}</td></tr>{% endfor %}</table>
+{% if execution.video_path %}<h3>Raw screen recording</h3><video controls preload="metadata" src="/media/{{ p.id }}/{{ execution.video_path }}"></video>{% endif %}
+<h3>Screenshots (captured during the run)</h3><div class="shots">{% for e in v.evidence if e.endswith('.png') %}<a href="/media/{{ p.id }}/{{ e }}"><img loading="lazy" src="/media/{{ p.id }}/{{ e }}" alt="{{ e }}"></a>{% endfor %}</div>
+<p class="small"><a href="/media/{{ p.id }}/{{ execution.log_path }}">Execution log</a> · <a href="/media/{{ p.id }}/runs/{{ execution.run_id }}/verification.json">verification.json</a></p>
+{% else %}<p class="muted">Not demonstrated yet.</p>{% endif %}</section>
+
+<section class="card" id="script"><h2>Script editor</h2>
+{% if script %}<p class="small muted">Generated by {{ script.generated_by }} from run {{ script.run_id }}{{ ' · edited by hand' if script.edited }}. Saving changes re-queues narration, render and QC.</p>
+<form method="post" action="/projects/{{ p.id }}/script">{% for seg in script.segments %}
+<label for="seg-{{ seg.id }}">{{ seg.kind|capitalize }}{% if seg.step_id %}: {{ seg.step_id }}{% endif %}</label>
+<textarea id="seg-{{ seg.id }}" name="seg-{{ seg.id }}">{{ seg.text }}</textarea>{% endfor %}
+<p><button type="submit">Save script</button></p></form>{% else %}<p class="muted">No script yet.</p>{% endif %}</section>
+
+<section class="card" id="voice"><h2>Voice studio</h2>
+{% if provider_error %}<div class="notice bad">{{ provider_error }}</div>{% else %}
+<p class="small">Provider: <b>{{ provider_name }}</b> {% if not provider_prod %}<span class="pill s-warning">development only — not publishable</span>{% else %}<span class="pill s-ok">production</span>{% endif %}</p>{% endif %}
+<form method="post" action="/projects/{{ p.id }}/voice"><div class="row">
+<div><label for="voice-sel">Voice</label><select id="voice-sel" name="voice">{% for v in (voices if provider_prod else []) %}<option value="{{ v.id }}" {{ 'selected' if v.id==p.request.voice }}>{{ v.label }}</option>{% endfor %}
+{% if not provider_prod %}<option value="{{ p.request.voice }}" selected>{{ p.request.voice }} (Azure; used once configured)</option>{% endif %}</select></div>
+<div><label for="rate">Speaking rate (%)</label><input type="number" id="rate" name="speaking_rate" min="-30" max="30" value="{{ p.request.speaking_rate }}"></div></div>
+<label for="pron">Pronunciation corrections (one per line: <code>term = how to say it</code>)</label>
+<textarea id="pron" name="pronunciations" placeholder="SQL = sequel">{% for k, v in p.request.pronunciations.items() %}{{ k }} = {{ v }}
+{% endfor %}</textarea>
+{% if settings.mode == 'development' %}<label class="check"><input type="checkbox" name="allow_dev_tts" value="true" {{ 'checked' if p.request.allow_dev_tts }}> Allow labeled robotic development voice when Azure is not configured</label>{% endif %}
+<p><button type="submit">Save voice settings</button></p></form>
+<h3>Preview</h3><div class="row"><input type="text" id="preview-text" value="Next, open the Data menu and choose Remove duplicates."><div><button type="button" onclick="preview()">Play preview</button> <span id="preview-msg" class="small muted"></span></div></div>
+<audio id="preview-audio" controls style="width:100%;margin-top:8px;display:none"></audio>
+{% if narration %}<h3>Narration segments ({{ narration.provider }}, {{ '%.1f'|format(narration.total_duration) }}s)</h3>
+<table class="small">{% for n in narration.segments %}<tr><td>{{ n.segment_id }}</td><td>{{ '%.1f'|format(n.duration) }}s{{ ' · cached' if n.cached }}</td>
+<td><audio controls preload="none" src="/media/{{ p.id }}/{{ rel(n.audio_path) }}"></audio></td></tr>{% endfor %}</table>
+{% if approval.narration_approved_at %}<div class="notice ok">Narration approved at {{ approval.narration_approved_at }}</div>
+{% elif narration.production_grade %}<form method="post" action="/projects/{{ p.id }}/approve-narration"><p><button class="primary">I listened to the narration — approve it</button></p></form>
+{% else %}<div class="notice warn">Development voice narration cannot be approved for publication.</div>{% endif %}{% endif %}
+</section>
+
+<section class="card" id="review"><h2>Video review</h2>
+{% if render %}{% if render.dev_watermark %}<div class="notice warn">This render uses the development voice and is watermarked. It is for pipeline testing only.</div>{% endif %}
+<video id="final-video" controls preload="metadata" src="/media/{{ p.id }}/{{ rel(render.video_path) }}"></video>
+<p class="small muted">{{ render.resolution }} · {{ render.duration|mmss }} · captions burned in and provided as <a href="/media/{{ p.id }}/{{ rel(render.srt_path) }}">SRT</a></p>
+<div class="row"><div><h3>Scenes / chapters</h3><table class="small">{% for c in render.chapters %}<tr><td><a href="#review" onclick="seek({{ c.start }})">{{ c.start|mmss }}</a></td><td>{{ c.title }}</td></tr>{% endfor %}</table></div>
+<div><h3>Captions (timing)</h3><div style="max-height:300px;overflow:auto"><table class="small">{% for c in render.cues %}<tr><td><a href="#review" onclick="seek({{ c.start }})">{{ '%.1f'|format(c.start) }}–{{ '%.1f'|format(c.end) }}</a></td><td>{{ c.text }}</td></tr>{% endfor %}</table></div></div></div>
+{% else %}<p class="muted">No video rendered yet.</p>{% endif %}</section>
+
+<section class="card" id="qc"><h2>Quality control</h2>
+{% if qc %}<table class="small"><tr><th>Severity</th><th>Category</th><th>Finding</th><th>Check type</th></tr>
+{% for i in qc.items %}<tr><td><span class="pill s-{{ i.severity }}">{{ i.severity }}</span></td><td>{{ i.category }}</td><td>{{ i.message }}</td>
+<td>{{ 'automated' if i.automated else 'needs human judgement' }}</td></tr>{% endfor %}</table>
+{% if execution and not execution.verification.environment.app_version and not approval.version_limitation_acknowledged %}
+<form method="post" action="/projects/{{ p.id }}/ack-version"><p><button>I acknowledge the software version is unknown</button></p></form>{% endif %}
+{% else %}<p class="muted">QC has not run yet.</p>{% endif %}</section>
+
+<section class="card" id="publishing"><h2>Publishing</h2>
+{% if gate %}<div class="notice bad"><b>Publishing blocked:</b><ul>{% for r in gate %}<li>{{ r }}</li>{% endfor %}</ul></div>
+{% else %}<div class="notice ok">All automated gates passed.</div>{% endif %}
+{% if meta %}<label>Title</label><input type="text" readonly value="{{ meta.title }}"><label>Description</label><textarea readonly style="min-height:200px">{{ meta.description }}</textarea>
+<label>Chapters</label><pre>{{ meta.chapters_text }}</pre><label>Thumbnail brief</label><p class="small">{{ meta.thumbnail_brief }}</p>{% endif %}
+{% if approval.final_approved_at %}<div class="notice ok">Final approval granted at {{ approval.final_approved_at }}.</div>
+<form method="post" action="/projects/{{ p.id }}/export"><button class="primary">Build export package</button></form>
+{% if publishing_pkg and publishing_pkg.export_zip %}<p><a class="btn" href="/media/{{ p.id }}/{{ publishing_pkg.export_zip }}">Download export (MP4, SRT, audio, metadata, QC and verification records)</a></p>{% endif %}
+<p class="small muted">YouTube upload is not implemented yet; upload the exported MP4 yourself.</p>
+{% elif not gate %}<form method="post" action="/projects/{{ p.id }}/approve"><label class="check"><input type="checkbox" name="confirm" value="true" required> I watched the full video, confirm it is accurate and authorize export.</label>
+<label for="notes">Notes</label><input type="text" id="notes" name="notes"><p><button class="primary">Grant final approval</button></p></form>{% endif %}
+</section>
+
+<section class="card" id="log"><h2>Activity log</h2><pre id="events">{% for e in events %}{{ e.ts[11:19] }} {{ e.level.upper() }} {{ e.stage or '' }} {{ e.message }}
+{% endfor %}</pre></section>
+<script>
+function seek(t){const v=document.getElementById('final-video'); if(v){v.currentTime=t; v.play();}}
+async function preview(){const m=document.getElementById('preview-msg'); m.textContent='Generating…';
+ const fd=new FormData(); fd.append('text', document.getElementById('preview-text').value);
+ const r=await fetch('/projects/{{ p.id }}/voice-preview',{method:'POST',body:fd});
+ if(!r.ok){m.textContent=(await r.json()).error; return;} const a=document.getElementById('preview-audio');
+ a.src=URL.createObjectURL(await r.blob()); a.style.display='block'; a.play(); m.textContent='';}
+{% if running or p.status == 'running' %}
+const poll=setInterval(async()=>{const r=await fetch('/api/projects/{{ p.id }}/status'); const s=await r.json();
+ for(const [k,v] of Object.entries(s.stages)){const el=document.querySelector(`[data-stage="${k}"]`); if(el){el.textContent=v.status; el.className='pill s-'+v.status;}}
+ document.getElementById('events').textContent=s.events.map(e=>`${e.ts.slice(11,19)} ${e.level.toUpperCase()} ${e.stage||''} ${e.message}`).join('\n');
+ if(!s.running){clearInterval(poll); location.reload();}},2000);
+{% endif %}
+</script>
+{% endblock %}

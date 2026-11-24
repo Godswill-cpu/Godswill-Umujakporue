@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Tutorial Studio{% endblock %} · Tutorial Studio</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><nav class="top"><span class="brand">Tutorial Studio</span><a href="/">Dashboard</a><a href="/create">Create video</a>
+<a href="/registry">Supported apps</a><a href="/settings">Settings</a>
+<span class="mode {{ 'dev' if settings.mode=='development' }}">{{ settings.mode }} mode</span></nav>
+<main>{% block body %}{% endblock %}</main>
+<footer class="muted small" style="text-align:center;padding:20px">Automated Software Tutorial Studio v{{ version }} · runs locally</footer>
+</body></html>

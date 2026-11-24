@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Create video{% endblock %}{% block body %}
+<h1>Create a tutorial</h1>
+<div class="card"><h2>Discovery mode</h2><p class="muted small">Candidate topics come from workflows with a tested automation adapter. No audience-demand data is used.</p>
+{% for t in discovered %}<div><a href="/create?workflow={{ t.workflow_id }}">{{ t.topic }}</a> <span class="muted small">— {{ t.summary }}</span></div>{% endfor %}</div>
+<form class="card" method="post" action="/create"><h2>Tutorial details</h2>
+<label for="topic">Tutorial topic</label><input type="text" id="topic" name="topic" required placeholder="How to Remove Duplicate Rows from a Spreadsheet"
+ value="{% for w in workflows %}{% if w.id==selected %}{{ w.title }}{% endif %}{% endfor %}">
+<div class="row">
+<div><label for="workflow_id">Target software and workflow</label><select id="workflow_id" name="workflow_id">
+{% for w in workflows %}<option value="{{ w.id }}" {{ 'selected' if w.id==selected }}>{{ w.title }} — {{ w.app_id }}</option>{% endfor %}</select>
+<div class="muted small">Only applications with a tested adapter are listed. <a href="/registry">See all applications</a>.</div></div>
+<div><label for="target_os">Target operating system</label><input type="text" id="target_os" name="target_os" value="Any (browser-based)"></div>
+<div><label for="target_version">Target software version (if known)</label><input type="text" id="target_version" name="target_version" placeholder="e.g. 1.0.0"></div>
+<div><label for="target_duration_s">Target duration (seconds)</label><input type="number" id="target_duration_s" name="target_duration_s" value="90" min="15" max="1800"></div>
+<div><label for="voice">Narration voice (Azure Neural)</label><select id="voice" name="voice">{% for v in voices %}<option value="{{ v.id }}">{{ v.label }}</option>{% endfor %}</select></div>
+<div><label for="speaking_rate">Speaking rate (%)</label><input type="number" id="speaking_rate" name="speaking_rate" value="0" min="-30" max="30"></div>
+<div><label for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option>beginner</option><option>intermediate</option><option>advanced</option></select></div>
+<div><label for="resolution">Output resolution</label><select id="resolution" name="resolution"><option>1920x1080</option><option>1280x720</option></select></div>
+</div>
+<label for="instructions">Additional instructions (optional)</label><textarea id="instructions" name="instructions"></textarea>
+{% if settings.mode == 'development' %}<label class="check"><input type="checkbox" name="allow_dev_tts" value="true"> Allow the robotic <b>development</b> voice if Azure is not configured (output is watermarked and can never be published)</label>{% endif %}
+{% if not settings.azure_configured %}<div class="notice warn">Azure AI Speech is not configured, so production narration will fail until you add a key in <a href="/settings">Settings</a>.</div>{% endif %}
+<label class="check"><input type="checkbox" name="start" value="true" checked> Start production immediately</label>
+<p><button class="primary" type="submit">Create project</button></p></form>
+{% endblock %}
