@@ -1,6 +1,7 @@
 """Stage orchestration: ordered, resumable stages run in a lightweight background thread."""
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import traceback
@@ -8,7 +9,7 @@ from pathlib import Path
 
 from . import planning, qc, scripting, video
 from .config import Settings, redact
-from .contracts import (Approval, Source, ExecutionResult, NarrationResult, QCReport, RenderResult, TutorialPlan,
+from .contracts import (Approval, ReverificationRecord, Source, ExecutionResult, NarrationResult, QCReport, RenderResult, TutorialPlan,
                         TutorialScript)
 from .db import STAGES, Database
 from .registry import get_adapter, get_workflow
@@ -79,6 +80,50 @@ class Pipeline:
         t = self._threads.get(pid)
         if t:
             t.join(timeout)
+
+    def start_reverify(self, pid: str) -> bool:
+        with self._lock:
+            if self.is_running(pid):
+                return False
+            t = threading.Thread(target=self._reverify_job, args=(pid,), daemon=True, name=f"reverify-{pid}")
+            self._threads[pid] = t
+            t.start()
+            return True
+
+    def _reverify_job(self, pid: str) -> None:
+        try:
+            self.reverify(pid)
+        except Exception as e:
+            self.db.log(pid, f"Re-verification could not run: {redact(str(e), self.settings)}", level="error", stage="reverify")
+
+    def reverify(self, pid: str) -> ReverificationRecord:
+        """Re-run the tested workflow and compare with the environment the video was produced in."""
+        from .demo_engine import run_demonstration
+        p = self._p(pid)
+        req = p["request"]
+        produced = self._need(p, "execution")
+        if req.capture_mode == "manual":
+            raise StageError("Manual-capture tutorials cannot be re-verified automatically; re-record and re-attest instead.")
+        self.db.log(pid, "Re-verification started (the approved video is not changed)", stage="reverify")
+        result = run_demonstration(get_adapter(req.app_id), get_workflow(req.app_id, req.workflow_id), self.project_dir(pid),
+                                   tuple(produced.viewport), chromium_executable=self.settings.chromium_executable,
+                                   headless=self.settings.browser_headless,
+                                   log=lambda m: self.db.log(pid, m, stage="reverify"))
+        old, new = produced.verification.environment, result.verification.environment
+        labels = {"app_version": "version", "app_build": "build", "app_edition": "edition", "browser_version": "browser version"}
+        changes = [f"{label}: {getattr(old, f) or 'unknown'} -> {getattr(new, f) or 'unknown'}"
+                   for f, label in labels.items() if getattr(old, f) != getattr(new, f)]
+        rec = ReverificationRecord(run_id=result.run_id, outcome=result.verification.outcome, environment=new,
+                                   changes=changes, evidence=result.verification.evidence,
+                                   failed_checks=[c.name for c in result.verification.checks if not c.passed]
+                                   + result.verification.compatibility_warnings)
+        history = list(p["state"].get("reverifications") or [])
+        history.append(json.loads(rec.model_dump_json()))
+        self.db.set_state(pid, "reverifications", history[-20:])
+        level = "info" if rec.outcome == "passed" and not changes else "warning"
+        self.db.log(pid, f"Re-verification {rec.outcome.upper()}: {rec.verdict}"
+                         + (f" ({'; '.join(changes)})" if changes else ""), level=level, stage="reverify")
+        return rec
 
     def first_incomplete(self, pid: str) -> str | None:
         stages = self.db.get_stages(pid)

@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import __version__, metrics, planning, publishing
 from ..config import Settings, load_settings, save_preferences, save_secret
-from ..contracts import Approval, ProjectRequest, TutorialScript, now_iso
+from ..contracts import Approval, ProjectRequest, ReverificationRecord, TutorialScript, now_iso
 from ..db import STAGES, Database
 from ..pipeline import Pipeline, load, workflow_for
 from ..manual_capture import ManualCaptureError, parse_steps, save_upload, steps_to_text
@@ -161,7 +161,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     rel=lambda path: rel(pid, path), events=db.events(pid), running=pipe.is_running(pid),
                     voices=voices, provider_error=provider_error, provider_name=provider_name,
                     provider_prod=provider_prod, publishing_pkg=p["state"].get("publishing"),
-                    workflow=workflow_for(p["request"]), m=metrics.project_metrics(db, p), manual=p["state"].get("manual_capture") or {},
+                    workflow=workflow_for(p["request"]), m=metrics.project_metrics(db, p),
+                    reverifications=[ReverificationRecord.model_validate(r)
+                                     for r in reversed(p["state"].get("reverifications") or [])], manual=p["state"].get("manual_capture") or {},
                     manual_steps_text=steps_to_text(p["request"].manual_steps))
 
     @app.get("/api/projects/{pid}/status")
@@ -200,6 +202,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(409, "No job is running for this project.")
         db.log(pid, "Stop requested: the current stage will finish, then the pipeline stops", level="warning")
         return RedirectResponse(f"/projects/{pid}#pipeline", status_code=303)
+
+    @app.post("/projects/{pid}/reverify")
+    def reverify(pid: str):
+        p = project_or_404(pid)
+        if not load(p, "execution"):
+            raise HTTPException(400, "This project has no demonstration to re-verify.")
+        if p["request"].capture_mode == "manual":
+            raise HTTPException(400, "Manual-capture tutorials cannot be re-verified automatically.")
+        if not pipe.start_reverify(pid):
+            raise HTTPException(409, "A job is already running for this project")
+        db.record_intervention(pid, "re-verification")
+        return RedirectResponse(f"/projects/{pid}#demo", status_code=303)
 
     @app.get("/jobs", response_class=HTMLResponse)
     def jobs(request: Request):
@@ -400,7 +414,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ex = load(p, "execution")
             if not ex:
                 continue
-            env = ex.verification.environment
+            history = p["state"].get("reverifications") or []
+            last = ReverificationRecord.model_validate(history[-1]) if history else None
+            if last and last.outcome != "passed":
+                retest.append({"p": p, "env": last.environment, "age": 0, "reason": "re-verification FAILED: workflow no longer works"})
+                continue
+            if last and last.changes:
+                retest.append({"p": p, "env": last.environment, "age": 0,
+                               "reason": "still works, but environment changed: " + "; ".join(last.changes)})
+                continue
+            env = last.environment if last else ex.verification.environment
             app_entry = get_app(p["request"].app_id)
             age = (datetime.now(timezone.utc) - datetime.fromisoformat(env.tested_at)).days
             outdated = app_entry and env.app_version and not any(env.app_version in v for v in app_entry.tested_versions)

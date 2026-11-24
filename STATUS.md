@@ -3,7 +3,7 @@
 **Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **44 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **46 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Live acceptance test (§14) — PASSED 2026-11-24
 `scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
@@ -46,6 +46,7 @@ Caveats, stated plainly:
 | Job management: Jobs page, stop-after-current-stage, retry, stages interrupted by a crash/restart marked failed on startup | `test_jobs_metrics` |
 | Automation measurement: active human time (visible page + interaction or media playing), intervention counts by type, machine time, automation % only against the user's own manual baseline and only for approved projects | `test_jobs_metrics` |
 | One-command install/start (`install.sh`/`start.sh`; `install.ps1`/`start.bat` for Windows) | install.sh + start.sh run from a clean copy; Windows scripts **not run** (no Windows host) |
+| Reverification: re-runs a produced tutorial's workflow without touching the approved video; records version/build/edition/browser changes and failures; registry lists tutorials needing attention | `test_reverification` |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live

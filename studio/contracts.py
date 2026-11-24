@@ -216,6 +216,23 @@ class ExecutionResult(BaseModel):
     started_at: str = Field(default_factory=now_iso)
 
 
+class ReverificationRecord(BaseModel):
+    """A later re-run of an already-produced tutorial's workflow (the approved video is untouched)."""
+    run_id: str
+    at: str = Field(default_factory=now_iso)
+    outcome: Literal["passed", "failed", "unsupported"]
+    environment: EnvironmentRecord
+    changes: list[str] = Field(default_factory=list)  # environment differences vs the produced video
+    failed_checks: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+
+    @property
+    def verdict(self) -> str:
+        if self.outcome != "passed":
+            return "workflow no longer works"
+        return "still works; environment changed" if self.changes else "still works; unchanged"
+
+
 # ----------------------------------------------------------------- script ---
 class ScriptSegment(BaseModel):
     id: str

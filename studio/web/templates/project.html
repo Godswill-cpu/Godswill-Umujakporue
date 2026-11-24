@@ -72,6 +72,12 @@
 {% for s in execution.steps %}<tr><td>{{ s.title }}</td><td><span class="pill s-{{ s.status }}">{{ s.status }}</span></td><td>{{ '%.1f'|format(s.t_start) }}–{{ '%.1f'|format(s.t_end) }}s</td><td>{{ s.message }}</td></tr>{% endfor %}</table>
 {% if execution.video_path %}<h3>Raw screen recording</h3><video controls preload="metadata" src="/media/{{ p.id }}/{{ execution.video_path }}"></video>{% endif %}
 <h3>Screenshots (captured during the run)</h3><div class="shots">{% for e in v.evidence if e.endswith('.png') %}<a href="/media/{{ p.id }}/{{ e }}"><img loading="lazy" src="/media/{{ p.id }}/{{ e }}" alt="{{ e }}"></a>{% endfor %}</div>
+<h3>Re-verification</h3>
+<p class="small muted">Re-runs the tested workflow on the current software to check this tutorial is still accurate. The approved video is not changed.</p>
+{% if p.request.capture_mode != 'manual' %}<form method="post" action="/projects/{{ p.id }}/reverify"><button {{ 'disabled' if running }}>Re-verify now</button></form>{% else %}<p class="small muted">Manual-capture tutorials must be re-recorded to re-verify.</p>{% endif %}
+{% if reverifications %}<table class="small"><tr><th>When</th><th>Result</th><th>Version</th><th>Changes</th></tr>
+{% for r in reverifications %}<tr><td>{{ r.at[:16].replace('T',' ') }}</td><td><span class="pill s-{{ 'passed' if r.outcome=='passed' and not r.changes else ('warning' if r.outcome=='passed' else 'failed') }}">{{ r.verdict }}</span></td>
+<td>{{ r.environment.app_version or 'unknown' }}</td><td>{{ r.changes|join('; ') or '—' }}{% if r.failed_checks %}<div style="color:var(--bad)">{{ r.failed_checks|join('; ') }}</div>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
 <p class="small"><a href="/media/{{ p.id }}/{{ execution.log_path }}">Execution log</a> · <a href="/media/{{ p.id }}/runs/{{ execution.run_id }}/verification.json">verification.json</a></p>
 {% else %}<p class="muted">Not demonstrated yet.</p>{% endif %}</section>
 
