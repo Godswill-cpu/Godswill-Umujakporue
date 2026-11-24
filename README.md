@@ -63,13 +63,21 @@ Environment variables (or `.env`) override Settings-page values:
 | `STUDIO_MODE` | `development` | `production` forbids non-Azure narration |
 | `STUDIO_DATA_DIR` | `./data` | database, projects, cache, secrets |
 | `STUDIO_HOST` / `STUDIO_PORT` | `127.0.0.1` / `8765` | bind address |
-| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | — | Azure AI Speech credentials |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | — | Azure AI Speech credentials (region id, e.g. `eastus`) |
+| `AZURE_SPEECH_TRANSPORT` | `auto` | `sdk`, `rest`, or `auto` (SDK, REST if the SDK cannot connect) |
 | `STUDIO_MAX_TTS_CHARS_PER_PROJECT` | `20000` | cost limit (cached segments are not counted) |
 | `STUDIO_CHROMIUM_EXECUTABLE` | — | explicit Chromium path |
 | `STUDIO_LLM_PROVIDER` | `none` | `anthropic` enables AI research |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key (or set it in Settings) |
 | `STUDIO_LLM_MODEL` | `claude-opus-5-5` | model used for research |
 | `STUDIO_MAX_LLM_TOKENS_PER_PROJECT` | `300000` | AI research budget per project |
+
+## Live acceptance run
+With real Azure credentials, run the full dashboard-driven acceptance test (production mode, nothing mocked):
+```bash
+AZURE_SPEECH_KEY=... AZURE_SPEECH_REGION=eastus python scripts/acceptance_run.py --out acceptance-output
+```
+It writes screenshots, the export ZIP and `acceptance_report.json` (13 checked steps).
 
 ## Tests
 ```bash
@@ -82,6 +90,7 @@ voice because CI has no Azure key; those tests assert that such output is **bloc
 - *"Executable doesn't exist … chromium"*: run `python -m playwright install chromium`, or set `STUDIO_CHROMIUM_EXECUTABLE`.
 - *Narration stage fails with "Azure AI Speech is not configured"*: add key + region in Settings, then *Run from here* on Narration.
 - *"authentication failed"*: wrong key/region pair.
+- *Log says the Speech SDK could not connect*: a proxy/firewall blocks WebSockets; narration continues over the Azure REST API (captions then lack word-level timing). Set `AZURE_SPEECH_TRANSPORT=rest` to skip the SDK attempt.
 - *Render fails mentioning `subtitles`*: your FFmpeg lacks libass; install a full FFmpeg build.
 - Any failed stage can be retried with **Run from here**; earlier completed stages are not repeated.
 - Logs: `data/studio.log` and each project's activity log; per-run `execution.log` and `verification.json`.

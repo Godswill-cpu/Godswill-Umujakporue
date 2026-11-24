@@ -40,11 +40,39 @@ def _ts(t: float) -> str:
     return f"{t//60}:{t%60:02d}" if t < 3600 else f"{t//3600}:{t//60%60:02d}:{t%60:02d}"
 
 
+YT_MIN_CHAPTER_S = 10
+
+
+def youtube_chapters(chapters, duration: float) -> list[tuple[float, str]]:
+    """YouTube ignores chapters unless the first starts at 0:00, there are at least three, and each lasts
+    at least 10 seconds. Merge short chapters into their neighbour; return [] if rules still fail."""
+    items = [[c.start, c.title] for c in chapters]
+    if not items:
+        return []
+    items[0][0] = 0.0
+    i = 0
+    while i < len(items):
+        end = items[i + 1][0] if i + 1 < len(items) else duration
+        if end - items[i][0] < YT_MIN_CHAPTER_S and len(items) > 1:
+            if i + 1 < len(items):  # merge the next chapter into this one
+                items[i][1] = f"{items[i][1]} & {items[i + 1][1]}"
+                del items[i + 1]
+            else:  # last chapter too short: merge into previous
+                items[i - 1][1] = f"{items[i - 1][1]} & {items[i][1]}"
+                del items[i]
+            continue
+        i += 1
+    for t in items:
+        t[1] = t[1].replace("& Result", "and result")[:100]
+    return [(a, b) for a, b in items] if len(items) >= 3 else []
+
+
 def build_metadata(plan: TutorialPlan, execution: ExecutionResult, render: RenderResult, script: TutorialScript) -> PublishingPackage:
     env = execution.verification.environment
-    chapters = "\n".join(f"{_ts(c.start)} {c.title}" for c in render.chapters)
+    yt = youtube_chapters(render.chapters, render.duration)
+    chapters = "\n".join(f"{_ts(t)} {title}" for t, title in yt)
     steps = "\n".join(f"{i}. {s.title}" for i, s in enumerate([s for s in execution.steps if s.status == "ok"], 1))
-    desc = (f"{plan.summary}\n\nSteps shown:\n{steps}\n\nChapters:\n{chapters}\n\n"
+    desc = (f"{plan.summary}\n\nSteps shown:\n{steps}\n\n" + (f"Chapters:\n{chapters}\n\n" if chapters else "") +
             f"{'Recorded by the creator' if execution.verification.method == 'human_attested' else 'Tested'} on {env.app_name} {env.app_version or '(version unknown)'}"
             f"{' build ' + env.app_build if env.app_build else ''}, {env.platform}, "
             f"{env.browser_name or ''} {env.browser_version or ''}, on {env.tested_at[:10]}.\n"

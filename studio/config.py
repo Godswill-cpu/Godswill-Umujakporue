@@ -37,6 +37,7 @@ class Settings(BaseModel):
     port: int = 8765
     azure_speech_key: SecretStr | None = None
     azure_speech_region: str | None = None
+    azure_speech_transport: Literal["auto", "sdk", "rest"] = "auto"
     max_tts_chars_per_project: int = 20000
     chromium_executable: str | None = None
     browser_headless: bool = True
@@ -74,6 +75,7 @@ class Settings(BaseModel):
             "port": self.port,
             "azure_speech_key": "configured" if self.azure_speech_key and self.azure_speech_key.get_secret_value() else "not configured",
             "azure_speech_region": self.azure_speech_region or "not configured",
+            "azure_speech_transport": self.azure_speech_transport,
             "max_tts_chars_per_project": self.max_tts_chars_per_project,
             "chromium_executable": self.chromium_executable or "(Playwright default)",
             "llm_provider": self.llm_provider,
@@ -110,6 +112,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         port=int(get("STUDIO_PORT", 8765)),
         azure_speech_key=SecretStr(key) if key else None,
         azure_speech_region=get("AZURE_SPEECH_REGION"),
+        azure_speech_transport=(get("AZURE_SPEECH_TRANSPORT", "auto") or "auto").lower(),
         max_tts_chars_per_project=int(get("STUDIO_MAX_TTS_CHARS_PER_PROJECT", 20000)),
         chromium_executable=get("STUDIO_CHROMIUM_EXECUTABLE") or None,
     )

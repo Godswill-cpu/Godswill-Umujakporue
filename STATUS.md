@@ -1,9 +1,23 @@
 # Status — 2026-11-24
 
-**Current phase:** Phase 1 and Phase 2 complete (incl. manual-capture fallback). Phase 3 mostly implemented (research-assisted planning added); vertical slice implemented and tested *except* a live
+**Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **41 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+
+## Live acceptance test (§14) — PASSED 2026-11-24
+`scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
+possible) and **real Azure Neural TTS (eastus, en-US-AndrewNeural)**: project created via the Create form →
+plan → real Playwright demonstration → automated verification passed → script → Azure narration → 1920×1080 MP4
+(69 s, −16.2 LUFS) with captions and chapters → QC (0 blockers) → narration approval → final approval → export
+ZIP with MP4, SRT, audio, YouTube metadata, thumbnail, QC report and version-verification record. 13/13 steps passed.
+
+Caveats, stated plainly:
+- The approval clicks in that run were made by the script, proving the approval workflow — not a human review of the video.
+- The application is the bundled Studio Sandbox Sheet, not Excel (unavailable in the dev container).
+- In the dev container the Azure Speech **SDK** WebSocket is blocked by the network proxy, so narration used the
+  official Azure Speech **REST** API (same neural voices, no word-boundary timings → captions timed by text length).
+  The SDK path is implemented but has not completed a live synthesis.
 
 ## Implemented and tested
 | Area | Evidence |
@@ -28,14 +42,13 @@ Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voic
 | Manual-capture fallback: upload own recording, mark steps, enter environment, attest; frames extracted from the recording; verification labelled `human_attested`; any change clears attestation; 4:3 etc. padded not stretched | `test_manual_capture` |
 | Research-assisted planning: fetches real documentation (https only, size limits), extracts text, asks the LLM for findings with verbatim quotes, **keeps only findings whose quote is found in the fetched source**, reports discarded claims, discrepancies with the tested workflow and uncertain statements; cached; per-project token budget | `test_research` (labeled fake LLM + real fetch of an official Google help page) |
 | Sourced troubleshooting tips in narration (by difficulty), shown over the verified final state, flagged for human review in QC | `test_research` |
+| Azure Neural TTS (live, eastus): SSML, voices, rate, pronunciations, REST transport, auth/400 errors, auto-switch from SDK when it cannot connect | `test_publishing_azure` (live), acceptance run |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
-- **Azure Neural TTS provider** (`studio/tts/azure.py`, official Speech SDK, SSML, word-boundary timings,
-  retries, auth errors). Only provider selection is tested. Needs a real key to validate. **Blocked on credentials.**
+- **Azure Speech SDK transport** (WebSocket, word-boundary timings): blocked by the dev container's proxy; REST transport is tested live.
 - **Anthropic (Claude) provider** for research (`studio/llm/anthropic_provider.py`: official SDK, structured outputs via `beta.messages.parse`, server-side refusal fallbacks, typed error handling). No API key in the dev environment, so it has never run live. **Blocked on credentials.**
 - Voice preview endpoint with Azure (works with dev voice).
-- Export package + thumbnail: code path only reachable after Azure narration is approved, so not yet exercised end to end.
 - Reverification list on the registry page (simple rules: >90 days, unknown version, version no longer tested).
 
 ## Partially implemented
@@ -53,6 +66,5 @@ Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voic
 ## Known limitations
 - The only supported application is the bundled **Studio Sandbox Sheet** test app, not a third-party product.
   Excel desktop is unavailable in the dev container; the acceptance test cannot use it.
-- The §14 acceptance test is **not yet passed**: step 7 (Azure narration) and the approval/export steps that
-  depend on it have not been run live.
+- YouTube chapters are merged to satisfy YouTube's rules (≥3 chapters, each ≥10 s); the review page keeps every scene.
 - No claim about the 85% automation target can be made yet.

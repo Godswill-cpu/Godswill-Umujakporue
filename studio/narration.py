@@ -10,11 +10,12 @@ from .media import volume_stats
 from .tts.base import TTSError, TTSProvider
 
 
-def select_provider(settings: Settings, req: ProjectRequest) -> TTSProvider:
+def select_provider(settings: Settings, req: ProjectRequest, log=None) -> TTSProvider:
     """Azure is the production provider. The dev voice is never a silent fallback."""
     if settings.azure_configured:
         from .tts.azure import AzureTTSProvider
-        return AzureTTSProvider(settings.azure_speech_key.get_secret_value(), settings.azure_speech_region)
+        return AzureTTSProvider(settings.azure_speech_key.get_secret_value(), settings.azure_speech_region,
+                                transport=settings.azure_speech_transport, log=log)
     if settings.mode == "production":
         raise TTSError("Production narration requires Azure AI Speech, which is not configured. "
                        "Add your key and region in Settings. No fallback voice is used in production.")

@@ -84,7 +84,8 @@ def _zoom_crop(box: dict, src: tuple[int, int], factor: float = 1.35) -> str:
     return f"crop={cw}:{ch}:{x}:{y},"
 
 
-def render_scene(source: Path, scene: Scene, out: Path, src_size: tuple[int, int], size: tuple[int, int]) -> float:
+def render_scene(source: Path, scene: Scene, out: Path, src_size: tuple[int, int], size: tuple[int, int],
+                 fade_in: bool = False) -> float:
     w, h = size
     clip = max(0.1, scene.src_end - scene.src_start)
     total = max(clip, scene.audio_duration + TAIL_PAD)
@@ -93,8 +94,9 @@ def render_scene(source: Path, scene: Scene, out: Path, src_size: tuple[int, int
           + (_zoom_crop(scene.zoom_box, src_size) if scene.zoom_box else "")
           + f"scale={w}:{h}:flags=lanczos:force_original_aspect_ratio=decrease,"
           + f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color={BRAND_BG},setsar=1,"
-          + f"tpad=stop_mode=clone:stop_duration={hold:.3f},"
-          + "fade=t=in:st=0:d=0.25")
+          + f"tpad=stop_mode=clone:stop_duration={hold:.3f}"
+          # footage is continuous between steps, so only the first scene fades in (after the title card)
+          + (",fade=t=in:st=0:d=0.35" if fade_in else ""))
     if scene.callout:
         s = h / 1080
         vf += "," + _drawtext(scene.callout, int(32 * s), f"{int(h*0.15)}", x=f"w-text_w-{int(48*s)}", box=True, bold=True)
@@ -178,7 +180,7 @@ def assemble(source: Path, scenes: list[Scene], out_dir: Path, title: str, subti
     for i, sc in enumerate(scenes, 1):
         log(f"Rendering scene {i}/{len(scenes)}: {sc.title}")
         part = out_dir / f"part-{i:03d}.mp4"
-        dur = render_scene(source, sc, part, src_size, size)
+        dur = render_scene(source, sc, part, src_size, size, fade_in=(i == 1))
         if i > 1 or sc.id != "intro":
             chapters.append(Chapter(start=round(t, 2), title=sc.title))
         cues += _cues_for(sc, t + 0.0)

@@ -41,3 +41,13 @@ tested steps. Discrepancies (e.g. different menu names) become plan warnings and
 `studio/llm/base.py` defines `structured(system, user, schema)`. The Anthropic implementation uses structured
 outputs (`beta.messages.parse`, pydantic schema), effort `high`, and server-side refusal fallbacks. Research
 results are cached by a hash of the prompt and sources; usage is recorded per project against a token budget.
+
+## D12 — Azure transports: SDK first, REST API when the SDK cannot connect
+Both are official Azure Speech integrations using the same neural voices. The SDK (WebSocket) also returns
+word-boundary timings; the REST API does not. `AZURE_SPEECH_TRANSPORT=auto` (default) tries the SDK and, only on a
+connection failure, switches to REST and logs it. Authentication or request errors never trigger a switch, and
+nothing ever falls back to a non-Azure voice. `sdk` or `rest` can be forced.
+
+## D13 — Scene transitions
+Only the first scene fades in after the title card. Footage between steps is continuous, so per-scene fades produced
+distracting dips to black and were removed.
