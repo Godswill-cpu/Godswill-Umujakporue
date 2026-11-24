@@ -38,6 +38,12 @@ Open http://127.0.0.1:8765. Everything else happens in the browser:
 6. Grant final approval → *Build export package* → download the ZIP (MP4, SRT, audio, YouTube metadata, thumbnail,
    QC report, version-verification record).
 
+### Software without an automation adapter (manual capture)
+Choose **Manual capture** on *Create video*, then on the project page upload your own screen recording, list
+when each step starts (`0:12 | Step title | narration`), fill in the version details you know and confirm the
+recording shows every step succeeding. The rest of the pipeline (narration, assembly, QC, approval, export)
+is identical; the video is labelled as human-verified rather than automatically verified.
+
 ### Without Azure (development only)
 In development mode a project can explicitly opt in to a **robotic offline voice** (FFmpeg libflite) to test
 the pipeline. Such videos are watermarked "DEVELOPMENT VOICE – NOT FOR PUBLICATION" and can never be approved or

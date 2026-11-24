@@ -25,6 +25,13 @@ class StageError(RuntimeError):
     pass
 
 
+def workflow_for(req):
+    if req.capture_mode == "manual":
+        from .manual_capture import workflow_from_manual
+        return workflow_from_manual(req)
+    return get_workflow(req.app_id, req.workflow_id)
+
+
 def load(project: dict, key: str):
     raw = project["state"].get(key)
     return MODELS[key].model_validate(raw) if raw is not None else None
@@ -117,10 +124,19 @@ class Pipeline:
             self.db.log(pid, w, level="warning", stage="plan")
 
     def stage_demonstrate(self, pid: str) -> None:
-        from .demo_engine import run_demonstration
         p = self._p(pid)
         req = p["request"]
         plan = self._need(p, "plan")
+        if req.capture_mode == "manual":
+            from .manual_capture import ingest
+            result = ingest(self.project_dir(pid), req, p["state"].get("manual_capture") or {},
+                            log=lambda m: self.db.log(pid, m, stage="demonstrate"))
+            for s in plan.steps:
+                s.status = "verified"
+            self.db.set_state(pid, "plan", plan)
+            self.db.set_state(pid, "execution", result)
+            return
+        from .demo_engine import run_demonstration
         adapter = get_adapter(req.app_id)
         wf = get_workflow(req.app_id, req.workflow_id)
         result = run_demonstration(adapter, wf, self.project_dir(pid), req.size,
@@ -140,7 +156,7 @@ class Pipeline:
         p = self._p(pid)
         req = p["request"]
         execution = self._need(p, "execution")
-        script = scripting.generate_script(req, get_workflow(req.app_id, req.workflow_id), execution)
+        script = scripting.generate_script(req, workflow_for(req), execution)
         est = scripting.estimate_seconds(script, req.speaking_rate)
         self.db.log(pid, f"Script: {len(script.segments)} segments, estimated narration {est:.0f}s "
                          f"(target video {req.target_duration_s}s)", stage="script")
@@ -162,7 +178,7 @@ class Pipeline:
         self.db.set_state(pid, "narration", result)
 
     def build_scenes(self, req, execution: ExecutionResult, script: TutorialScript, narration: NarrationResult) -> list[video.Scene]:
-        wf = get_workflow(req.app_id, req.workflow_id)
+        wf = workflow_for(req)
         specs = {s.id: s for s in wf.steps}
         steps = [s for s in execution.steps if s.status == "ok"]
         by_step = {s.step_id: s for s in steps}

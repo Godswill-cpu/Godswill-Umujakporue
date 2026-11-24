@@ -30,6 +30,7 @@ stages in background threads. No queues, microservices or cloud services except 
 | `planning` | topic discovery, tutorial plan | `ProjectRequest` → `TutorialPlan` |
 | `adapters/*` | app-specific: environment, version detection, end-state verification | `WorkflowSpec`, `EnvironmentRecord`, `Check` |
 | `demo_engine` | generic Playwright runner: isolation, recording, screenshots, step assertions | → `ExecutionResult` + `VerificationRecord` |
+| `manual_capture` | fallback: user recording + step marks + attestation → `ExecutionResult` (method `human_attested`) | upload → `ExecutionResult` |
 | `scripting` | narration text from observed results of successful steps | `ExecutionResult` → `TutorialScript` |
 | `tts/*` + `narration` | provider abstraction, Azure SDK, dev voice, caching, limits, audio QC | `TutorialScript` → `NarrationResult` |
 | `media` + `video` | FFmpeg probing and assembly, captions, chapters | → `RenderResult` |

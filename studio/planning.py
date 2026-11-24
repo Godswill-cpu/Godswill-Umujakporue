@@ -18,6 +18,8 @@ def discover_topics() -> list[dict]:
 
 
 def build_plan(req: ProjectRequest) -> TutorialPlan:
+    if req.capture_mode == "manual":
+        return _manual_plan(req)
     wf = get_workflow(req.app_id, req.workflow_id)
     app = get_app(req.app_id)
     warnings: list[str] = []
@@ -42,3 +44,16 @@ def build_plan(req: ProjectRequest) -> TutorialPlan:
         research_note="Plan taken from the tested adapter workflow definition. Automated web research and "
                       "LLM-assisted planning are not implemented in this release; no external sources were consulted.",
     )
+
+
+def _manual_plan(req: ProjectRequest) -> TutorialPlan:
+    from .manual_capture import workflow_from_manual
+    wf = workflow_from_manual(req)
+    warnings = ["Manual capture: steps come from the user and are verified by human attestation only."]
+    if not req.manual_steps:
+        warnings.append("No steps marked yet. Upload a recording and mark step times in the Demonstration manager.")
+    return TutorialPlan(
+        workflow_id=wf.id, title=req.topic, summary=wf.summary, prerequisites=wf.prerequisites,
+        steps=[PlanStep(step_id=s.id, title=s.title, expected=s.expected, source_ids=s.source_ids) for s in wf.steps],
+        sources=wf.sources, warnings=warnings, generated_by="user (manual capture)",
+        research_note="Steps were entered by the user for their own recording. No automated research was performed.")

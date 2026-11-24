@@ -1,9 +1,9 @@
 # Status — 2026-11-24
 
-**Current phase:** Phase 1 complete. Phases 2–3 vertical slice implemented and tested *except* a live
+**Current phase:** Phase 1 and Phase 2 complete (incl. manual-capture fallback). Phase 3 vertical slice implemented and tested *except* a live
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **27 passed** (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Implemented and tested
 | Area | Evidence |
@@ -25,6 +25,7 @@ Test suite: `pytest -q` → **27 passed** (real Chromium + real FFmpeg; dev voic
 | FFmpeg assembly: title card, scene sync (hold last frame until narration ends), contextual zoom, step callouts, fades, burned + SRT captions, loudness normalization, chapters | `test_rendering`, e2e |
 | QC: media validity, demo failures, missing steps, missing narration, dev voice, sync, silence, caption timing, resolution, duration, repetition, licensing note, human-judgement items | e2e |
 | Publishing gate (verified demo, no QC blockers, production narration approved, version ack) | `test_narration_policy`, e2e negative |
+| Manual-capture fallback: upload own recording, mark steps, enter environment, attest; frames extracted from the recording; verification labelled `human_attested`; any change clears attestation; 4:3 etc. padded not stretched | `test_manual_capture` |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
@@ -40,7 +41,6 @@ Test suite: `pytest -q` → **27 passed** (real Chromium + real FFmpeg; dev voic
 - Captions timed by character share when word timings are absent (dev voice); Azure word timings used when present.
 
 ## Planned (not started)
-- Manual capture / human-verified fallback for unsupported workflows.
 - Provider-agnostic LLM integration (research-assisted planning, adaptive scripts).
 - Additional adapters (Google Sheets with test account first); desktop automation adapters.
 - Optional authorized YouTube upload.

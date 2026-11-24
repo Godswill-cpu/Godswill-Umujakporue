@@ -91,7 +91,8 @@ def render_scene(source: Path, scene: Scene, out: Path, src_size: tuple[int, int
     hold = total - clip
     vf = (f"trim=start={scene.src_start:.3f}:end={scene.src_end:.3f},setpts=PTS-STARTPTS,fps={FPS},"
           + (_zoom_crop(scene.zoom_box, src_size) if scene.zoom_box else "")
-          + f"scale={w}:{h}:flags=lanczos,setsar=1,"
+          + f"scale={w}:{h}:flags=lanczos:force_original_aspect_ratio=decrease,"
+          + f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color={BRAND_BG},setsar=1,"
           + f"tpad=stop_mode=clone:stop_duration={hold:.3f},"
           + "fade=t=in:st=0:d=0.25")
     if scene.callout:

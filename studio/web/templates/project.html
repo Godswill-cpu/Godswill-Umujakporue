@@ -24,8 +24,29 @@
 
 <section class="card" id="demo"><h2>Demonstration manager</h2>
 <p class="small muted">Workflow <b>{{ workflow.id }}</b> · verification rule: {{ workflow.verification }}</p>
+{% if p.request.capture_mode == 'manual' %}
+<div class="notice warn small"><b>Manual capture.</b> Upload your own recording of {{ p.request.manual_app_name }}, mark when each step starts, and confirm it shows every step succeeding. Screenshots are taken from your recording; nothing is executed or generated.</div>
+<form method="post" action="/projects/{{ p.id }}/manual-capture" enctype="multipart/form-data">
+<label for="recording">Screen recording (MP4, WebM, MOV, MKV){% if manual.video_path %} — uploaded: <a href="/media/{{ p.id }}/{{ manual.video_path }}">{{ manual.video_path }}</a>{% endif %}</label>
+<input type="file" id="recording" name="recording" accept="video/*">
+<label for="msteps">Steps — one per line: <code>mm:ss | step title | narration (optional) | expected result (optional)</code></label>
+<textarea id="msteps" name="steps" style="min-height:120px" placeholder="0:04 | Select the data | Select the cells you want to summarise.&#10;0:11 | Insert a PivotTable | On the Insert tab, choose PivotTable.">{{ manual_steps_text }}</textarea>
+<div class="row">
+<div><label for="app_version">Version (leave blank if unknown)</label><input type="text" id="app_version" name="app_version" value="{{ manual.app_version or '' }}"></div>
+<div><label for="app_build">Build</label><input type="text" id="app_build" name="app_build" value="{{ manual.app_build or '' }}"></div>
+<div><label for="app_edition">Edition</label><input type="text" id="app_edition" name="app_edition" value="{{ manual.app_edition or '' }}"></div>
+<div><label for="os_name">Operating system</label><input type="text" id="os_name" name="os_name" value="{{ manual.os or '' }}"></div>
+<div><label for="platform_name">Platform</label><input type="text" id="platform_name" name="platform_name" value="{{ manual.platform or '' }}" placeholder="Desktop / Web"></div>
+<div><label for="browser_name">Browser (web apps)</label><input type="text" id="browser_name" name="browser_name" value="{{ manual.browser_name or '' }}"></div>
+<div><label for="browser_version">Browser version</label><input type="text" id="browser_version" name="browser_version" value="{{ manual.browser_version or '' }}"></div>
+<div><label for="recorded_on">Recorded on (date)</label><input type="text" id="recorded_on" name="recorded_on" value="{{ manual.recorded_on or '' }}" placeholder="YYYY-MM-DD"></div>
+</div>
+{% if manual.attested_at %}<div class="notice ok small">Attested at {{ manual.attested_at }}. Changing the recording, steps or environment clears the attestation.</div>{% endif %}
+<label class="check"><input type="checkbox" name="attest" value="true"> I confirm this recording is mine, contains no private data, and shows every listed step and the successful result.</label>
+<p><button class="primary" {{ 'disabled' if running }}>Save manual capture</button></p></form>
+{% endif %}
 {% if execution %}{% set v = execution.verification %}
-<div class="notice {{ 'ok' if v.outcome=='passed' else 'bad' }}">Verification <b>{{ v.outcome.upper() }}</b> at {{ v.verified_at }} (run {{ execution.run_id }})</div>
+<div class="notice {{ 'ok' if v.outcome=='passed' else 'bad' }}">Verification <b>{{ v.outcome.upper() }}</b> ({{ 'automated' if v.method=='automated' else 'human attestation' }}) at {{ v.verified_at }} (run {{ execution.run_id }})</div>
 <h3>Environment record</h3><table class="small">
 <tr><th>Application</th><td>{{ v.environment.app_name }}</td><th>Edition</th><td>{{ v.environment.app_edition or 'unknown' }}</td></tr>
 <tr><th>Version</th><td>{{ v.environment.app_version or 'UNKNOWN' }}</td><th>Build</th><td>{{ v.environment.app_build or 'unknown' }}</td></tr>

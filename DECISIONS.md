@@ -23,3 +23,10 @@ Needed to test the pipeline without Azure keys. Only usable in development mode 
 
 ## D8 — Planning from adapter workflow definitions until research is implemented
 The plan clearly states that no external research or LLM was used. Steps stay "planned" until the demonstration verifies them.
+
+## D9 — Manual capture is verified by human attestation, and labelled as such
+For software without an adapter (e.g. Excel desktop) the user uploads their own recording, marks step times
+and attests that it shows each step succeeding. The verification record carries `method: human_attested`;
+QC adds a human-judgement warning and the YouTube description says "Recorded by the creator" instead of
+"Tested". Unknown environment fields stay unknown. Screenshots are frames of the uploaded recording only.
+Attestation is cleared whenever the recording, steps or environment details change.

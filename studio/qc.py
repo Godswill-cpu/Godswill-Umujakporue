@@ -27,6 +27,10 @@ def run_qc(project_dir: Path, req: ProjectRequest, plan: TutorialPlan | None, ex
         for w in v.compatibility_warnings:
             sev = "warning" if "version" in w.lower() else "blocker"
             add(f"compat-{abs(hash(w)) % 10**6}", sev, "compatibility", w)
+        if v.method == "human_attested":
+            add("verification-human", "warning", "verification", "Manual capture: the result was verified by your "
+                "attestation, not by automated inspection of the application. Re-watch every step carefully.",
+                automated=False)
         env = v.environment
         if not env.app_version:
             add("version-unknown", "warning", "version", "Software version unknown. The tested environment is documented; "
@@ -115,8 +119,12 @@ def run_qc(project_dir: Path, req: ProjectRequest, plan: TutorialPlan | None, ex
         if narration and render.duration + 0.5 < narration.total_duration:
             add("sync-short", "blocker", "sync", "Video is shorter than its narration.")
 
-    add("media-licensing", "info", "licensing", "All footage is the app's own recording, title cards are generated, "
-        "and no third-party music or images are used.")
+    if execution and execution.verification.method == "human_attested":
+        add("media-licensing", "warning", "licensing", "Footage was uploaded by you. Confirm you own the rights to it "
+            "and that it shows no private or sensitive data.", automated=False)
+    else:
+        add("media-licensing", "info", "licensing", "All footage is the app's own recording, title cards are generated, "
+            "and no third-party music or images are used.")
     # --- human judgement (never automated) -----------------------------
     add("human-narration", "info", "human review", "Listen to the full narration and approve it in Voice Studio.", automated=False)
     add("human-video", "info", "human review", "Watch the full video; confirm narration matches what is on screen.", automated=False)

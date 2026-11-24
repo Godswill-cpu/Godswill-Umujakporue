@@ -45,15 +45,17 @@ def build_metadata(plan: TutorialPlan, execution: ExecutionResult, render: Rende
     chapters = "\n".join(f"{_ts(c.start)} {c.title}" for c in render.chapters)
     steps = "\n".join(f"{i}. {s.title}" for i, s in enumerate([s for s in execution.steps if s.status == "ok"], 1))
     desc = (f"{plan.summary}\n\nSteps shown:\n{steps}\n\nChapters:\n{chapters}\n\n"
-            f"Tested on {env.app_name} {env.app_version or '(version unknown)'}"
+            f"{'Recorded by the creator' if execution.verification.method == 'human_attested' else 'Tested'} on {env.app_name} {env.app_version or '(version unknown)'}"
             f"{' build ' + env.app_build if env.app_build else ''}, {env.platform}, "
             f"{env.browser_name or ''} {env.browser_version or ''}, on {env.tested_at[:10]}.\n"
             "Narration voice is AI-generated (Azure Neural TTS).")
-    brief = (f"Thumbnail brief: show the before/after of the sheet (from {execution.observations.get('initial_rows', '?')} "
-             f"to {execution.observations.get('final_rows', '?')} rows). Large text: '{plan.title.replace('How to ', '').upper()}'. "
+    obs = execution.observations
+    result = (f"the before/after of the sheet (from {obs['initial_rows']} to {obs['final_rows']} rows)"
+              if "initial_rows" in obs and "final_rows" in obs else "the final result exactly as it appears in the video")
+    brief = (f"Thumbnail brief: show {result}. Large text: '{plan.title.replace('How to ', '').upper()}'. "
              "Use the real final-state screenshot; do not depict features not shown in the video.")
     return PublishingPackage(title=plan.title[:100], description=desc, chapters_text=chapters,
-                             tags=["tutorial", "spreadsheet", "remove duplicates", env.app_name], thumbnail_brief=brief)
+                             tags=["tutorial", "how to", env.app_name], thumbnail_brief=brief)
 
 
 def make_thumbnail(screenshot: Path, title: str, out: Path) -> Path:

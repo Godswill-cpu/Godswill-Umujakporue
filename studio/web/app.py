@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,7 +15,8 @@ from .. import __version__, planning, publishing
 from ..config import Settings, load_settings, save_preferences, save_secret
 from ..contracts import Approval, ProjectRequest, TutorialScript, now_iso
 from ..db import STAGES, Database
-from ..pipeline import Pipeline, load
+from ..pipeline import Pipeline, load, workflow_for
+from ..manual_capture import ManualCaptureError, parse_steps, save_upload, steps_to_text
 from ..registry import APPS, get_app, get_workflow, supported_workflows
 
 HERE = Path(__file__).resolve().parent
@@ -89,22 +90,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     discovered=planning.discover_topics())
 
     @app.post("/create")
-    def create(request: Request, topic: str = Form(...), workflow_id: str = Form(...),
+    def create(request: Request, topic: str = Form(...), workflow_id: str = Form(""), capture_mode: str = Form("automated"),
+               manual_app_name: str = Form(""),
                target_os: str = Form("Any (browser-based)"), target_version: str = Form(""),
                target_duration_s: int = Form(90), voice: str = Form("en-US-AndrewNeural"),
                speaking_rate: int = Form(0), difficulty: str = Form("beginner"), resolution: str = Form("1920x1080"),
                instructions: str = Form(""), allow_dev_tts: bool = Form(False), start: bool = Form(False)):
-        wf = next((w for w in supported_workflows() if w.id == workflow_id), None)
-        if not wf:
-            raise HTTPException(400, "Choose a supported workflow. Unsupported applications cannot be automated.")
-        req = ProjectRequest(topic=topic.strip() or wf.title, app_id=wf.app_id, workflow_id=wf.id, target_os=target_os,
+        if capture_mode == "manual":
+            if not topic.strip() or not manual_app_name.strip():
+                raise HTTPException(400, "Manual capture needs a topic and the application name.")
+            app_id, wf_id, default_title = "manual", "manual", topic.strip()
+        else:
+            wf = next((w for w in supported_workflows() if w.id == workflow_id), None)
+            if not wf:
+                raise HTTPException(400, "Choose a supported workflow, or use manual capture. "
+                                         "Unsupported applications cannot be automated.")
+            app_id, wf_id, default_title = wf.app_id, wf.id, wf.title
+        req = ProjectRequest(topic=topic.strip() or default_title, app_id=app_id, workflow_id=wf_id,
+                             capture_mode="manual" if capture_mode == "manual" else "automated",
+                             manual_app_name=manual_app_name.strip()[:120], target_os=target_os,
                              target_version=target_version.strip(), target_duration_s=max(15, min(target_duration_s, 1800)),
                              voice=voice, speaking_rate=max(-30, min(speaking_rate, 30)), difficulty=difficulty,
                              resolution=resolution, instructions=instructions,
                              allow_dev_tts=bool(allow_dev_tts) and settings.mode == "development")
         pid = db.create_project(req.topic, req)
-        db.log(pid, f"Project created for workflow {wf.id}")
-        if start:
+        db.log(pid, f"Project created ({req.capture_mode} capture, workflow {wf_id})")
+        if start and req.capture_mode == "manual":
+            pipe.start(pid, only=True)  # plan only; the rest waits for the upload
+        elif start:
             pipe.start(pid)
         return RedirectResponse(f"/projects/{pid}", status_code=303)
 
@@ -128,7 +141,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     rel=lambda path: rel(pid, path), events=db.events(pid), running=pipe.is_running(pid),
                     voices=voices, provider_error=provider_error, provider_name=provider_name,
                     provider_prod=provider_prod, publishing_pkg=p["state"].get("publishing"),
-                    workflow=get_workflow(p["request"].app_id, p["request"].workflow_id))
+                    workflow=workflow_for(p["request"]), manual=p["state"].get("manual_capture") or {},
+                    manual_steps_text=steps_to_text(p["request"].manual_steps))
 
     @app.get("/api/projects/{pid}/status")
     def status(pid: str):
@@ -145,6 +159,54 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not pipe.start(pid, from_stage or None, only):
             raise HTTPException(409, "A job is already running for this project")
         return RedirectResponse(f"/projects/{pid}#pipeline", status_code=303)
+
+    @app.post("/projects/{pid}/manual-capture")
+    def manual_capture(pid: str, recording: UploadFile | None = File(None), steps: str = Form(""),
+                       app_version: str = Form(""), app_edition: str = Form(""), app_build: str = Form(""),
+                       os_name: str = Form(""), platform_name: str = Form(""), browser_name: str = Form(""),
+                       browser_version: str = Form(""), recorded_on: str = Form(""), attest: bool = Form(False)):
+        p = project_or_404(pid)
+        req: ProjectRequest = p["request"]
+        if req.capture_mode != "manual":
+            raise HTTPException(400, "This project uses automated capture.")
+        if pipe.is_running(pid):
+            raise HTTPException(409, "A job is already running for this project")
+        cap = dict(p["state"].get("manual_capture") or {})
+        pdir = pipe.project_dir(pid)
+        changed = False
+        try:
+            if recording is not None and recording.filename:
+                dest = save_upload(recording.file, recording.filename, pdir)
+                cap["video_path"] = str(dest.relative_to(pdir))
+                changed = True
+                db.log(pid, f"Manual recording uploaded: {recording.filename}", stage="demonstrate")
+            if steps.strip():
+                new_steps = parse_steps(steps)
+                if new_steps != req.manual_steps:
+                    req = req.model_copy(update={"manual_steps": new_steps})
+                    db.update_request(pid, req)
+                    changed = True
+        except ManualCaptureError as e:
+            raise HTTPException(400, str(e))
+        env = {"app_version": app_version, "app_edition": app_edition, "app_build": app_build, "os": os_name,
+               "platform": platform_name, "browser_name": browser_name, "browser_version": browser_version,
+               "recorded_on": recorded_on}
+        if any((cap.get(k) or "") != v.strip() for k, v in env.items()):
+            changed = True
+        cap.update({k: v.strip()[:200] for k, v in env.items()})
+        if changed:
+            cap.pop("attested_at", None)  # any change requires a fresh attestation
+        if attest:
+            if not cap.get("video_path") or not req.manual_steps:
+                raise HTTPException(400, "Upload a recording and mark the steps before confirming.")
+            cap["attested_at"] = now_iso()
+            db.log(pid, "User attested that the manual recording shows every step succeeding", stage="demonstrate")
+        db.set_state(pid, "manual_capture", cap)
+        if cap.get("attested_at"):
+            pipe.start(pid, "plan")  # re-plan from the marked steps, then ingest and continue
+        elif changed:
+            pipe.invalidate_from(pid, "demonstrate")
+        return RedirectResponse(f"/projects/{pid}#demo", status_code=303)
 
     @app.post("/projects/{pid}/script")
     async def save_script(request: Request, pid: str):

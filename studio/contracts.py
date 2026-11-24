@@ -16,6 +16,14 @@ def now_iso() -> str:
 
 
 # ---------------------------------------------------------------- request ---
+class ManualStep(BaseModel):
+    """A step marked by the user on their own recording (manual-capture fallback)."""
+    start: float  # seconds into the uploaded recording
+    title: str
+    narration: str = ""
+    expected: str = ""
+
+
 class ProjectRequest(BaseModel):
     topic: str
     app_id: str
@@ -32,6 +40,10 @@ class ProjectRequest(BaseModel):
     # mode; output is watermarked and can never pass the publishing gate.
     allow_dev_tts: bool = False
     pronunciations: dict[str, str] = Field(default_factory=dict)
+    # "automated" = tested adapter drives the app; "manual" = user uploads their own recording.
+    capture_mode: Literal["automated", "manual"] = "automated"
+    manual_app_name: str = ""
+    manual_steps: list[ManualStep] = Field(default_factory=list)
 
     @property
     def size(self) -> tuple[int, int]:
@@ -123,6 +135,8 @@ class VerificationRecord(BaseModel):
     workflow_id: str
     environment: EnvironmentRecord
     outcome: Literal["passed", "failed", "unsupported"]
+    # automated = adapter inspected real app state; human_attested = the user confirmed a manual recording.
+    method: Literal["automated", "human_attested"] = "automated"
     checks: list[Check]
     compatibility_warnings: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)  # project-relative paths
