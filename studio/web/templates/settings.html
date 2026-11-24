@@ -19,6 +19,7 @@
 <div><label for="max_llm_tokens">Max AI tokens per project</label><input type="number" id="max_llm_tokens" name="max_llm_tokens" value="{{ info.max_llm_tokens_per_project }}"></div></div>
 <label class="check"><input type="checkbox" name="clear_anthropic_key" value="true"> Remove stored Anthropic key</label>
 <p><button class="primary">Save settings</button></p></form>
+<div class="card"><h2>System check</h2><table class="small">{% for c in checks %}<tr><td><span class="pill s-{{ 'passed' if c.ok else 'failed' }}">{{ 'OK' if c.ok else 'problem' }}</span></td><td>{{ c.name }}</td><td class="muted">{{ c.detail }}</td></tr>{% endfor %}</table></div>
 <div class="card"><h2>Environment</h2><table class="small">{% for k, v in info.items() %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
 <p class="small muted">Environment variables override these settings (see README).</p></div>
 {% endblock %}

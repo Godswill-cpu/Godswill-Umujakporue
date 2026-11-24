@@ -46,3 +46,38 @@ def test_srt_format(tmp_path):
     from studio.contracts import CaptionCue
     p = write_srt([CaptionCue(start=3661.5, end=3662.25, text="x")], tmp_path / "c.srt")
     assert "01:01:01,500 --> 01:01:02,250" in p.read_text()
+
+
+def test_paths_with_colons_apostrophes_and_spaces_render(tmp_path, monkeypatch):
+    """Windows paths contain drive-letter colons; user folders can contain apostrophes and spaces."""
+    import shutil
+    from studio.contracts import CaptionCue
+    from studio.video import _drawtext, filter_path, find_fonts
+    d = tmp_path / "O'Brien:test dir"
+    d.mkdir()
+    font = d / "my font.ttf"
+    shutil.copy(find_fonts()[0], font)
+    monkeypatch.setenv("STUDIO_FONT_FILE", str(font))
+    assert find_fonts()[0] == font
+    srt = write_srt([CaptionCue(start=0, end=2, text="Caption")], d / "captions.srt")
+    reg, _, fam = find_fonts()
+    vf = (f"subtitles=filename={filter_path(srt)}:fontsdir={filter_path(reg.parent)}:force_style='FontName={fam}',"
+          + _drawtext("Title", 40, "20"))
+    run_ffmpeg(["-f", "lavfi", "-i", "color=c=blue:s=320x180:d=1", "-vf", vf, "-frames:v", "1", str(d / "out.png")])
+    assert (d / "out.png").stat().st_size > 1000
+
+
+def test_missing_font_fails_clearly(monkeypatch):
+    import pytest
+    import studio.video as v
+    from studio.media import MediaError
+    monkeypatch.delenv("STUDIO_FONT_FILE", raising=False)
+    monkeypatch.setattr(v, "FONT_CANDIDATES", [("/nope/a.ttf", "/nope/b.ttf", "X")])
+    with pytest.raises(MediaError, match="STUDIO_FONT_FILE"):
+        v.find_fonts()
+
+
+def test_system_check_reports_ffmpeg_and_font():
+    from studio.media import system_check
+    names = {c["name"]: c for c in system_check()}
+    assert names["FFmpeg"]["ok"] and names["Font"]["ok"] and names["FFmpeg filter 'subtitles'"]["ok"]

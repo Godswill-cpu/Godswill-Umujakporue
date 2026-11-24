@@ -74,3 +74,10 @@ the run). Adapters can now start/stop their own environment (`setup_environment`
 Narration text keeps numbers and versions as written ("10 rows", "Python 3", "4.6.6"). Azure reads them naturally,
 and captions then match what is on screen. The earlier spell-out pass was removed (it produced "Python three" captions
 and would have mangled version numbers).
+
+## D18 — Explicit fonts and escaped filter paths (Windows fix)
+A user's Windows render crashed FFmpeg (0xC0000005) because no font file was passed and FFmpeg fell back to an
+unconfigured Fontconfig. Titles and captions now always use an explicit font file (Segoe UI/Arial on Windows, Arial on
+macOS, DejaVu on Linux; `STUDIO_FONT_FILE` overrides), and the caption renderer gets `fontsdir`. File paths inside
+FFmpeg filter arguments are escaped for both parsing levels (drive-letter colons, apostrophes), verified by rendering
+through a folder named `O'Brien:test dir`. FFmpeg output is decoded as UTF-8. Settings shows a System check.

@@ -12,10 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .contracts import CaptionCue, Chapter, RenderResult
-from .media import probe_duration, run_ffmpeg
+from .media import MediaError, probe_duration, run_ffmpeg
 
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 BRAND_BG = "0x0f172a"
 BRAND_ACCENT = "0x22c55e"
 FPS = 30
@@ -37,9 +35,49 @@ class Scene:
     words: list | None = None
 
 
+# Font files are always passed explicitly: FFmpeg's Fontconfig fallback is not configured in common
+# Windows/macOS builds and can crash FFmpeg ("Cannot load default config file").
+FONT_CANDIDATES = [
+    # (regular, bold, family name for captions)
+    ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf", "Segoe UI"),
+    ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf", "Arial"),
+    ("/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "Arial"),
+    ("/Library/Fonts/Arial.ttf", "/Library/Fonts/Arial Bold.ttf", "Arial"),
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVu Sans"),
+    ("/usr/share/fonts/dejavu/DejaVuSans.ttf", "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf", "DejaVu Sans"),
+]
+
+
+def find_fonts() -> tuple[Path, Path, str]:
+    """Return (regular, bold, family). STUDIO_FONT_FILE / STUDIO_FONT_BOLD_FILE / STUDIO_FONT_FAMILY override."""
+    import os
+    override = os.environ.get("STUDIO_FONT_FILE")
+    if override and Path(override).is_file():
+        bold = os.environ.get("STUDIO_FONT_BOLD_FILE") or override
+        return Path(override), Path(bold if Path(bold).is_file() else override), os.environ.get("STUDIO_FONT_FAMILY", "Arial")
+    windir = os.environ.get("WINDIR")
+    candidates = FONT_CANDIDATES
+    if windir:  # Windows may not live on C:
+        candidates = [(r.replace("C:/Windows", windir.replace("\\", "/")), b.replace("C:/Windows", windir.replace("\\", "/")), f)
+                      for r, b, f in FONT_CANDIDATES[:2]] + FONT_CANDIDATES
+    for regular, bold, family in candidates:
+        if Path(regular).is_file():
+            return Path(regular), Path(bold) if Path(bold).is_file() else Path(regular), family
+    raise MediaError("No usable font found for titles and captions. Set STUDIO_FONT_FILE to a .ttf file "
+                     "(for example C:/Windows/Fonts/arial.ttf).")
+
+
+def filter_path(path) -> str:
+    """Quote a file path for use inside an FFmpeg filter argument (handles Windows drive letters)."""
+    p = str(Path(path).resolve()).replace("\\", "/")
+    # Two parsing levels: inside the quotes ':' needs one backslash; a quote must leave the quotes and be
+    # escaped for both levels (\\\').
+    return "'" + p.replace(":", "\\:").replace("'", "'\\\\\\''") + "'"
+
+
 def _font(bold: bool = False) -> str:
-    path = Path(FONT_BOLD if bold else FONT)
-    return str(path) if path.exists() else ""
+    regular, bold_file, _ = find_fonts()
+    return filter_path(bold_file if bold else regular)
 
 
 def _esc(text: str) -> str:
@@ -50,9 +88,7 @@ def _esc(text: str) -> str:
 def _drawtext(text: str, size: int, y: str, color: str = "white", bold: bool = False, x: str = "(w-text_w)/2",
               box: bool = False) -> str:
     font = _font(bold)
-    parts = [f"text='{_esc(text)}'", f"fontsize={size}", f"fontcolor={color}", f"x={x}", f"y={y}"]
-    if font:
-        parts.insert(0, f"fontfile='{font}'")
+    parts = [f"fontfile={font}", f"text='{_esc(text)}'", f"fontsize={size}", f"fontcolor={color}", f"x={x}", f"y={y}"]
     if box:
         parts += ["box=1", "boxcolor=black@0.62", "boxborderw=18"]
     return "drawtext=" + ":".join(parts)
@@ -197,8 +233,9 @@ def assemble(source: Path, scenes: list[Scene], out_dir: Path, title: str, subti
     vf = []
     if burn_captions:
         h = size[1]
-        style = f"FontName=DejaVu Sans,FontSize={int(h/1080*16)},Bold=1,Outline=2,Shadow=1,BorderStyle=1,OutlineColour=&H00000000,BackColour=&H80000000,MarginV={int(h/1080*28)}"
-        vf.append(f"subtitles='{srt}':force_style='{style}'")
+        regular, _, family = find_fonts()
+        style = f"FontName={family},FontSize={int(h/1080*16)},Bold=1,Outline=2,Shadow=1,BorderStyle=1,OutlineColour=&H00000000,BackColour=&H80000000,MarginV={int(h/1080*28)}"
+        vf.append(f"subtitles=filename={filter_path(srt)}:fontsdir={filter_path(regular.parent)}:force_style='{style}'")
     if dev_watermark:
         vf.append(_drawtext("DEVELOPMENT VOICE - NOT FOR PUBLICATION", int(size[1] / 1080 * 26), f"{int(size[1]*0.05)}",
                             color="0xffcc00", box=True, bold=True, x=f"w-text_w-{int(size[1]/1080*48)}"))

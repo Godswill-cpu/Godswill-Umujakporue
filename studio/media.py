@@ -20,7 +20,7 @@ def require_ffmpeg() -> None:
 
 def run_ffmpeg(args: list[str], timeout: int = 600) -> str:
     cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", *args]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     if proc.returncode != 0:
         tail = "\n".join(proc.stderr.strip().splitlines()[-12:])
         raise MediaError(f"ffmpeg failed ({proc.returncode}):\n{tail}")
@@ -29,7 +29,7 @@ def run_ffmpeg(args: list[str], timeout: int = 600) -> str:
 
 def probe(path: Path) -> dict:
     proc = subprocess.run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         raise MediaError(f"ffprobe could not read {path}: {proc.stderr.strip()[:300]}")
     return json.loads(proc.stdout)
@@ -66,3 +66,24 @@ def silences(path: Path, min_len: float = 3.0, noise_db: int = -45) -> list[tupl
     for i, s in enumerate(starts):
         pairs.append((max(0.0, s), ends[i] if i < len(ends) else total))
     return pairs
+
+
+def system_check() -> list[dict]:
+    """Quick environment diagnostics shown on the Settings page."""
+    import platform
+    results = []
+    ff = shutil.which("ffmpeg")
+    results.append({"name": "FFmpeg", "ok": bool(ff), "detail": ff or "not found on PATH"})
+    if ff:
+        filters = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+        for f, why in (("subtitles", "burned-in captions"), ("drawtext", "titles and callouts"), ("loudnorm", "audio normalisation")):
+            ok = f" {f} " in filters
+            results.append({"name": f"FFmpeg filter '{f}'", "ok": ok, "detail": why if ok else f"missing - needed for {why}"})
+    try:
+        from .video import find_fonts
+        reg, bold, fam = find_fonts()
+        results.append({"name": "Font", "ok": True, "detail": f"{fam}: {reg}"})
+    except Exception as e:
+        results.append({"name": "Font", "ok": False, "detail": str(e)})
+    results.append({"name": "Platform", "ok": True, "detail": f"{platform.system()} {platform.release()}, Python {platform.python_version()}"})
+    return results

@@ -435,7 +435,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request, saved: bool = False):
-        return page(request, "settings.html", info=settings.public_dict(), saved=saved)
+        from ..media import system_check
+        return page(request, "settings.html", info=settings.public_dict(), saved=saved, checks=system_check())
 
     @app.post("/settings")
     def save_settings(azure_key: str = Form(""), azure_region: str = Form(""), clear_key: bool = Form(False),

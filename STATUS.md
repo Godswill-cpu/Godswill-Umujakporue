@@ -3,7 +3,7 @@
 **Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **50 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **51 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Live acceptance test (§14) — PASSED 2026-11-24
 `scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
@@ -73,6 +73,10 @@ warnings, export complete. 13/13 steps passed (approval clicks again made by the
 - Additional adapters (Google Sheets with test account first); desktop automation adapters.
 - Optional authorized YouTube upload.
 - Real automation evidence: measurement is implemented, but no real tutorial has been produced by a user with a baseline yet, so **no automation percentage can be claimed**.
+
+## Field reports
+- 2026-11-24, Windows: video assembly crashed FFmpeg (Fontconfig, no font file). Fixed (D18); fix verified on Linux
+  with Windows-style problem paths, **not yet confirmed on the user's Windows PC**.
 
 ## Known limitations
 - Supported apps: the bundled Studio Sandbox Sheet (test app) and **JupyterLab 4** (real). Excel desktop is unavailable
