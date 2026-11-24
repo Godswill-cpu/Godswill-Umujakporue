@@ -63,3 +63,14 @@ so the figure can overstate automation; this limitation is shown in the UI.
 Stage status lives in SQLite. On startup any stage still marked running is marked failed ("Interrupted") so it can
 be retried. Stopping is cooperative: the current stage finishes, then the pipeline stops. Killing a thread mid-stage
 (e.g. inside FFmpeg or a browser) was rejected as unsafe.
+
+## D16 — JupyterLab as the first real third-party application
+Chosen because it is widely used, browser-based, installs locally, runs fully offline with synthetic data, reports its
+own version, and exposes a REST API that lets the adapter verify results independently of the UI. Each run gets its own
+server (localhost, free port, empty temp root, terminals disabled, no token — reachable only locally and only during
+the run). Adapters can now start/stop their own environment (`setup_environment`/`teardown_environment`).
+
+## D17 — Scripts keep digits
+Narration text keeps numbers and versions as written ("10 rows", "Python 3", "4.6.6"). Azure reads them naturally,
+and captions then match what is on screen. The earlier spell-out pass was removed (it produced "Python three" captions
+and would have mangled version numbers).

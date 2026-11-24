@@ -2,7 +2,7 @@
 <h1>Supported applications</h1>
 <div class="card"><p class="small muted">Only applications marked <b>supported</b> have a tested automation adapter. Others are listed so it is clear they are not automatable yet.</p>
 <div class="table-wrap"><table><tr><th>Application</th><th>Status</th><th>Type / platforms</th><th>Tested versions</th><th>Automation</th><th>Workflows</th></tr>
-{% for a in apps %}<tr><td><b>{{ a.name }}</b><div class="muted small">{{ a.notes }}</div></td><td><span class="pill s-{{ a.status }}">{{ a.status.replace('_',' ') }}</span></td>
+{% for a in apps %}<tr><td><b>{{ a.name }}</b><div class="muted small">{{ a.notes }}</div></td><td><span class="pill s-{{ a.status }}">{{ a.status.replace('_',' ') }}</span>{% if a.status=='supported' and not a.available %} <span class="pill s-warning">not installed</span>{% endif %}</td>
 <td class="small">{{ a.kind }} · {{ a.platforms|join(', ') }}</td><td class="small">{{ a.tested_versions|join(', ') or '—' }}</td><td class="small">{{ a.automation }}</td>
 <td class="small">{% for w in a.workflows %}<div>{{ w }}</div>{% else %}—{% endfor %}</td></tr>{% endfor %}</table></div></div>
 <div class="card"><h2>Tutorials that may need re-testing</h2>

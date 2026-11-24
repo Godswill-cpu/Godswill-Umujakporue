@@ -69,7 +69,7 @@ class StepSpec(BaseModel):
     """One automatable action in a supported workflow (defined by an adapter)."""
     id: str
     title: str
-    action: Literal["click", "check", "type", "wait"]
+    action: Literal["click", "check", "type", "wait"]  # "type" clicks the field first, then types value
     selector: str | None = None
     value: str | None = None
     expected: str  # observable outcome the engine asserts after the action
@@ -78,6 +78,10 @@ class StepSpec(BaseModel):
     beginner_note: str = ""
     zoom: bool = False
     pause_after_ms: int = 1200
+    select_all_first: bool = False  # for "type": replace the field's current text
+    expect_js: str | None = None  # JS predicate that must become true after the action
+    timeout_ms: int = 5000
+    present_at_start: bool = True  # False for controls that only appear mid-workflow (menus, dialogs)
     source_ids: list[str] = Field(default_factory=list)
 
 

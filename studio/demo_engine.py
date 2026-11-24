@@ -63,6 +63,23 @@ def run_demonstration(adapter, workflow: WorkflowSpec, project_dir: Path, viewpo
         log(msg)
 
     rel = lambda p: str(Path(p).relative_to(project_dir))
+
+    try:
+        adapter.setup_environment(run_dir, note)
+    except Exception as e:
+        note(f"Test environment could not be started: {e}")
+        adapter.teardown_environment(note)
+        raise
+    try:
+        return _run(adapter, workflow, project_dir, run_dir, run_id, shots, viewport, chromium_executable, headless,
+                    note, log_lines, rel)
+    finally:
+        adapter.teardown_environment(note)
+
+
+def _run(adapter, workflow, project_dir, run_dir, run_id, shots, viewport, chromium_executable, headless,
+         note, log_lines, rel) -> ExecutionResult:
+    from playwright.sync_api import sync_playwright
     results: list[StepResult] = []
     observations: dict = {}
     checks: list[Check] = []
@@ -104,7 +121,7 @@ def run_demonstration(adapter, workflow: WorkflowSpec, project_dir: Path, viewpo
 
             # Compatibility: every control the workflow needs must exist in this environment.
             for s in workflow.steps:
-                if s.selector and page.locator(s.selector).count() == 0:
+                if s.selector and s.present_at_start and page.locator(s.selector).count() == 0:
                     warnings.append(f"Missing control for step '{s.title}': {s.selector}")
             if warnings:
                 raise DemoAborted("Interface does not match the tested workflow: " + "; ".join(warnings))
@@ -121,8 +138,12 @@ def run_demonstration(adapter, workflow: WorkflowSpec, project_dir: Path, viewpo
                 try:
                     box = None
                     if s.selector:
-                        loc = page.locator(s.selector)
-                        loc.wait_for(state="visible", timeout=5000)
+                        loc = page.locator(s.selector).first
+                        try:
+                            loc.wait_for(state="visible", timeout=s.timeout_ms)
+                        except Exception:
+                            warnings.append(f"Control not found for step '{s.title}': {s.selector}")
+                            raise DemoAborted(f"Control not found (renamed or missing?): {s.selector}")
                         box = loc.bounding_box()
                         r.target_box = box
                         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -134,13 +155,18 @@ def run_demonstration(adapter, workflow: WorkflowSpec, project_dir: Path, viewpo
                         if not page.locator(s.selector).is_checked():
                             page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
                     elif s.action == "type":
-                        page.keyboard.type(s.value or "", delay=60)
+                        page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
+                        if s.select_all_first:
+                            page.keyboard.press("ControlOrMeta+A")
+                        page.keyboard.type(s.value or "", delay=55)
                     elif s.action == "wait":
                         pass
                     if s.expect_selector:
-                        page.locator(s.expect_selector).first.wait_for(state="attached", timeout=5000)
+                        page.locator(s.expect_selector).first.wait_for(state="attached", timeout=s.timeout_ms)
                         if not page.locator(s.expect_selector).first.is_visible():
                             raise DemoAborted(f"Expected outcome not visible: {s.expected}")
+                    if s.expect_js:
+                        page.wait_for_function(s.expect_js, timeout=s.timeout_ms)
                     page.wait_for_timeout(s.pause_after_ms)
                     shot = shots / f"{i:02d}-{s.id}.png"
                     page.screenshot(path=str(shot))

@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .adapters.base import AppAdapter
+from .adapters.jupyterlab import JupyterLabAdapter, jupyterlab_available
 from .adapters.sandbox_sheet import SandboxSheetAdapter
 from .contracts import WorkflowSpec
 
@@ -26,9 +27,10 @@ class AppEntry(BaseModel):
     notes: str
     workflows: list[str] = []
     doc_urls: list[str] = []  # official documentation used for research
+    available: bool = True  # tested adapter exists but its software may not be installed on this machine
 
 
-_ADAPTERS: dict[str, AppAdapter] = {"sandbox-sheet": SandboxSheetAdapter()}
+_ADAPTERS: dict[str, AppAdapter] = {"sandbox-sheet": SandboxSheetAdapter(), "jupyterlab": JupyterLabAdapter()}
 
 APPS: list[AppEntry] = [
     AppEntry(id="sandbox-sheet", name="Studio Sandbox Sheet (bundled test app)", kind="web",
@@ -36,6 +38,13 @@ APPS: list[AppEntry] = [
              automation="Playwright (Chromium), network-isolated local file", status="supported",
              notes="Synthetic spreadsheet used to validate the full pipeline end to end. Not a third-party product.",
              workflows=list(_ADAPTERS["sandbox-sheet"].workflows())),
+    AppEntry(id="jupyterlab", name="JupyterLab", kind="web", platforms=["Any OS with Python 3.11+ (local server) + Chromium"],
+             tested_versions=["4.6.6 (jupyter_server 2.21.1)"], automation="Playwright (Chromium) against an isolated local server",
+             status="supported", available=jupyterlab_available(),
+             notes="Real open-source application. Each run starts its own server in an empty temporary folder "
+                   "(localhost only, terminals disabled); results are verified through the Jupyter Contents API.",
+             workflows=list(_ADAPTERS["jupyterlab"].workflows()),
+             doc_urls=[]),
     AppEntry(id="google-sheets", name="Google Sheets", kind="web", platforms=["Browser"], tested_versions=[],
              automation="Playwright (planned)", status="planned",
              notes="Needs a dedicated test account and isolated test spreadsheets; no tested adapter yet. "
@@ -58,6 +67,8 @@ def get_adapter(app_id: str) -> AppAdapter:
     app = get_app(app_id)
     if not app or app.status != "supported" or app_id not in _ADAPTERS:
         raise LookupError(f"Application '{app_id}' is not supported for automated demonstration.")
+    if not app.available:
+        raise LookupError(f"{app.name} has a tested adapter but is not installed on this machine.")
     return _ADAPTERS[app_id]
 
 

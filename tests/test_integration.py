@@ -41,8 +41,8 @@ def test_end_to_end_with_dev_voice_is_rendered_but_never_publishable(client, set
     assert st["execution"]["verification"]["environment"]["app_version"] == "1.0.0"
     assert all(step["status"] == "verified" for step in st["plan"]["steps"])
     # script numbers come from observed state
-    assert "ten data rows" in st["script"]["segments"][0]["text"]
-    assert "three duplicates" in st["script"]["segments"][-1]["text"]
+    assert "10 data rows" in st["script"]["segments"][0]["text"]
+    assert "3 duplicates" in st["script"]["segments"][-1]["text"]
     assert st["narration"]["production_grade"] is False
     video = Path(st["render"]["video_path"])
     assert video.exists() and st["render"]["dev_watermark"] is True

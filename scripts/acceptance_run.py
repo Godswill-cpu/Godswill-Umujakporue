@@ -35,6 +35,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="acceptance-output")
     ap.add_argument("--resolution", default="1920x1080")
+    ap.add_argument("--workflow", default="sandbox-sheet.remove-duplicates")
+    ap.add_argument("--topic", default="")
+    ap.add_argument("--voice", default="en-US-AndrewNeural")
     args = ap.parse_args()
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -48,7 +51,7 @@ def main() -> int:
     server = subprocess.Popen([sys.executable, "-m", "studio"], cwd=ROOT, env=env,
                               stdout=open(out / "server.log", "w"), stderr=subprocess.STDOUT)
     base = f"http://127.0.0.1:{port}"
-    report: dict = {"started": time.strftime("%Y-%m-%dT%H:%M:%S"), "steps": []}
+    report: dict = {"started": time.strftime("%Y-%m-%dT%H:%M:%S"), "workflow": args.workflow, "voice": args.voice, "steps": []}
 
     def step(name, ok, detail=""):
         report["steps"].append({"step": name, "ok": bool(ok), "detail": detail})
@@ -72,9 +75,11 @@ def main() -> int:
 
             # 1-2. create project, select target software environment
             page.goto(base + "/create")
-            page.fill("#topic", "How to Remove Duplicate Rows from a Spreadsheet")
-            page.select_option("#workflow_id", "sandbox-sheet.remove-duplicates")
-            page.select_option("#voice", "en-US-AndrewNeural")
+            page.goto(f"{base}/create?workflow={args.workflow}")
+            if args.topic:
+                page.fill("#topic", args.topic)
+            page.select_option("#workflow_id", args.workflow)
+            page.select_option("#voice", args.voice)
             page.select_option("#difficulty", "beginner")
             page.select_option("#resolution", args.resolution)
             shot("01-create")

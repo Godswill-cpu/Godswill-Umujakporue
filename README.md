@@ -5,8 +5,9 @@ tutorial video**: it executes the workflow for real in an isolated environment, 
 result, writes narration from what actually happened, narrates it with Azure Neural TTS, assembles a 16:9 MP4
 with captions, runs quality control and — only after your approval — exports the video and YouTube metadata.
 
-> **Current state:** vertical slice. One supported application (a bundled test spreadsheet) and one
-> workflow ("remove duplicate rows") run end to end. See [STATUS.md](STATUS.md) for exactly what is
+> **Current state:** two supported applications run end to end with live Azure narration: a bundled test
+> spreadsheet ("remove duplicate rows") and **JupyterLab 4** ("create and run your first notebook"). Other software
+> can be used through manual capture. See [STATUS.md](STATUS.md) for exactly what is
 > implemented, tested and still missing.
 
 ## Requirements

@@ -59,8 +59,10 @@ def test_database_project_lifecycle(tmp_path):
 
 
 def test_registry_only_exposes_tested_adapters():
+    from studio.registry import _ADAPTERS
     supported = [a for a in APPS if a.status == "supported"]
-    assert [a.id for a in supported] == ["sandbox-sheet"]
+    assert {a.id for a in supported} == set(_ADAPTERS) == {"sandbox-sheet", "jupyterlab"}
+    assert all(a.workflows and a.tested_versions for a in supported)
     for a in APPS:
         if a.status != "supported":
             with pytest.raises(LookupError):

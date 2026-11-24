@@ -19,6 +19,12 @@ class AppAdapter(ABC):
     @abstractmethod
     def workflows(self) -> dict[str, WorkflowSpec]: ...
 
+    def setup_environment(self, work_dir, log) -> None:
+        """Start the isolated test environment (e.g. a local server with synthetic data). Default: nothing."""
+
+    def teardown_environment(self, log) -> None:
+        """Stop and clean up whatever setup_environment started. Must be safe to call after a failed setup."""
+
     @abstractmethod
     def environment_url(self) -> str:
         """URL of the isolated test environment."""

@@ -3,7 +3,7 @@
 **Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **46 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **50 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Live acceptance test (§14) — PASSED 2026-11-24
 `scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
@@ -18,6 +18,12 @@ Caveats, stated plainly:
 - In the dev container the Azure Speech **SDK** WebSocket is blocked by the network proxy, so narration used the
   official Azure Speech **REST** API (same neural voices, no word-boundary timings → captions timed by text length).
   The SDK path is implemented but has not completed a live synthesis.
+
+## Second live acceptance run — JupyterLab 4.6.6 — PASSED 2026-11-24
+Same dashboard-driven script (`--workflow jupyterlab.first-notebook --voice en-US-AvaNeural`), production mode, live
+Azure narration: real JupyterLab server and Python kernel, 9 steps, 5 independent checks via the Jupyter Contents
+API (notebook saved, typed code, real kernel output, Python kernel, no Untitled left), 96 s 1080p video, 0 QC
+warnings, export complete. 13/13 steps passed (approval clicks again made by the script).
 
 ## Implemented and tested
 | Area | Evidence |
@@ -47,6 +53,7 @@ Caveats, stated plainly:
 | Automation measurement: active human time (visible page + interaction or media playing), intervention counts by type, machine time, automation % only against the user's own manual baseline and only for approved projects | `test_jobs_metrics` |
 | One-command install/start (`install.sh`/`start.sh`; `install.ps1`/`start.bat` for Windows) | install.sh + start.sh run from a clean copy; Windows scripts **not run** (no Windows host) |
 | Reverification: re-runs a produced tutorial's workflow without touching the approved video; records version/build/edition/browser changes and failures; registry lists tutorials needing attention | `test_reverification` |
+| **JupyterLab adapter** (real third-party app): per-run isolated server (localhost, empty temp folder, terminals off, news/update checks off), version detection from the app (appVersion, jupyter_server, kernel), API-based verification, renamed-command detection, server always shut down | `test_jupyterlab` + live acceptance run |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
@@ -68,7 +75,7 @@ Caveats, stated plainly:
 - Real automation evidence: measurement is implemented, but no real tutorial has been produced by a user with a baseline yet, so **no automation percentage can be claimed**.
 
 ## Known limitations
-- The only supported application is the bundled **Studio Sandbox Sheet** test app, not a third-party product.
-  Excel desktop is unavailable in the dev container; the acceptance test cannot use it.
+- Supported apps: the bundled Studio Sandbox Sheet (test app) and **JupyterLab 4** (real). Excel desktop is unavailable
+  in the dev container; Google Sheets needs a dedicated test account.
 - YouTube chapters are merged to satisfy YouTube's rules (≥3 chapters, each ≥10 s); the review page keeps every scene.
 - No claim about the 85% automation target can be made yet.

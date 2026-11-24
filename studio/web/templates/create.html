@@ -13,7 +13,7 @@
 <div class="notice warn small">Manual recordings are verified by your attestation, not automatically. You will upload the video and mark step times on the project page.</div></div>
 <div class="row">
 <div id="auto-fields"><label for="workflow_id">Target software and workflow</label><select id="workflow_id" name="workflow_id">
-{% for w in workflows %}<option value="{{ w.id }}" {{ 'selected' if w.id==selected }}>{{ w.title }} — {{ w.app_id }}</option>{% endfor %}</select>
+{% for w in workflows %}{% set app = (apps|selectattr('id','equalto',w.app_id)|first) %}<option value="{{ w.id }}" {{ 'selected' if w.id==selected }} {{ 'disabled' if app and not app.available }}>{{ w.title }} — {{ app.name if app else w.app_id }}{{ ' (not installed)' if app and not app.available }}</option>{% endfor %}</select>
 <div class="muted small">Only applications with a tested adapter are listed. <a href="/registry">See all applications</a>.</div></div>
 <div><label for="target_os">Target operating system</label><input type="text" id="target_os" name="target_os" value="Any (browser-based)"></div>
 <div><label for="target_version">Target software version (if known)</label><input type="text" id="target_version" name="target_version" placeholder="e.g. 1.0.0"></div>
