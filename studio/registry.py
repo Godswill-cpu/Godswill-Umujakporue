@@ -25,6 +25,7 @@ class AppEntry(BaseModel):
     status: Literal["supported", "planned", "not_supported"]
     notes: str
     workflows: list[str] = []
+    doc_urls: list[str] = []  # official documentation used for research
 
 
 _ADAPTERS: dict[str, AppAdapter] = {"sandbox-sheet": SandboxSheetAdapter()}
@@ -37,7 +38,8 @@ APPS: list[AppEntry] = [
              workflows=list(_ADAPTERS["sandbox-sheet"].workflows())),
     AppEntry(id="google-sheets", name="Google Sheets", kind="web", platforms=["Browser"], tested_versions=[],
              automation="Playwright (planned)", status="planned",
-             notes="Needs a dedicated test account and isolated test spreadsheets; no tested adapter yet."),
+             notes="Needs a dedicated test account and isolated test spreadsheets; no tested adapter yet. "
+                   "Use manual capture meanwhile."),
     AppEntry(id="canva", name="Canva", kind="web", platforms=["Browser"], tested_versions=[],
              automation="none", status="not_supported", notes="No adapter. Use manual capture (later phase)."),
     AppEntry(id="chatgpt", name="ChatGPT", kind="web", platforms=["Browser"], tested_versions=[],

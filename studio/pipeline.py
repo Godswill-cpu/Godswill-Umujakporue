@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import planning, qc, scripting, video
 from .config import Settings, redact
-from .contracts import (Approval, ExecutionResult, NarrationResult, QCReport, RenderResult, TutorialPlan,
+from .contracts import (Approval, Source, ExecutionResult, NarrationResult, QCReport, RenderResult, TutorialPlan,
                         TutorialScript)
 from .db import STAGES, Database
 from .registry import get_adapter, get_workflow
@@ -43,6 +43,10 @@ class Pipeline:
         self.db = db
         self._threads: dict[str, threading.Thread] = {}
         self._lock = threading.Lock()
+        from .llm import select_llm
+        from .research.sources import fetch
+        self.llm_factory = select_llm  # replaceable in tests (labeled fakes only)
+        self.fetcher = fetch
 
     def project_dir(self, pid: str) -> Path:
         d = self.settings.projects_dir / pid
@@ -117,8 +121,45 @@ class Pipeline:
         return val
 
     def stage_plan(self, pid: str) -> None:
+        from .llm import select_llm
+        from .llm.base import LLMError
+        from .registry import get_app
+        from .research.analyze import collect_urls, run_research
         p = self._p(pid)
-        plan = planning.build_plan(p["request"])
+        req = p["request"]
+        plan = planning.build_plan(req)
+        app = get_app(req.app_id)
+        urls = collect_urls(req, app.doc_urls if app else [])
+        if urls:
+            llm = self.llm_factory(self.settings)
+            if llm is None:
+                plan.warnings.append("Documentation URLs were given, but no AI provider is configured (Settings), "
+                                     "so no research was performed.")
+            else:
+                provider_key = f"llm:{llm.name}"
+                left = self.settings.max_llm_tokens_per_project - self.db.billed_characters(pid, provider_key)
+                try:
+                    report = run_research(req, workflow_for(req), urls, self.project_dir(pid), self.settings.cache_dir,
+                                          llm, left, fetcher=self.fetcher,
+                                          log=lambda m: self.db.log(pid, m, stage="plan"))
+                    self.db.record_usage(pid, provider_key, report.input_tokens + report.output_tokens, report.cached)
+                    plan.research = report
+                    plan.research_note = (f"Research by {report.provider} ({report.model}) on {len(report.docs)} fetched "
+                                          f"source(s). Each finding's quote was checked verbatim against its source; "
+                                          f"{len(report.rejected)} unsupported claim(s) were discarded. Findings are "
+                                          "sourced, not demonstrated; the step sequence comes from the "
+                                          + ("user's manual capture." if req.capture_mode == "manual" else "tested adapter workflow."))
+                    plan.sources += [Source(
+                        id=d.id, title=d.title, url=d.url, kind=d.kind, note=f"fetched {d.fetched_at}")
+                        for d in report.docs]
+                    for f in report.findings:
+                        if f.kind == "discrepancy":
+                            plan.warnings.append(f"Documentation differs from the tested workflow: {f.claim} [{f.source_id}]")
+                    for st in plan.steps:
+                        st.source_ids += [f.source_id for f in report.findings if f.step_id == st.step_id
+                                          and f.source_id not in st.source_ids]
+                except LLMError as e:
+                    plan.warnings.append(f"Research failed: {redact(str(e), self.settings)}")
         self.db.set_state(pid, "plan", plan)
         for w in plan.warnings:
             self.db.log(pid, w, level="warning", stage="plan")
@@ -156,7 +197,7 @@ class Pipeline:
         p = self._p(pid)
         req = p["request"]
         execution = self._need(p, "execution")
-        script = scripting.generate_script(req, workflow_for(req), execution)
+        script = scripting.generate_script(req, workflow_for(req), execution, load(p, "plan"))
         est = scripting.estimate_seconds(script, req.speaking_rate)
         self.db.log(pid, f"Script: {len(script.segments)} segments, estimated narration {est:.0f}s "
                          f"(target video {req.target_duration_s}s)", stage="script")
@@ -188,8 +229,11 @@ class Pipeline:
             n = audio[seg.id]
             if seg.kind == "intro":
                 a, b, title, box, callout = execution.t_ready, (steps[0].t_start if steps else execution.video_duration), "Overview", None, None
-            elif seg.kind == "outro":
-                a, b, title, box, callout = (steps[-1].t_end if steps else execution.t_ready), execution.video_duration, "Result", None, "Result verified"
+            elif seg.kind in ("outro", "tip"):
+                # the verified final state stays on screen
+                a = steps[-1].t_end if steps else execution.t_ready
+                b, box = execution.video_duration, None
+                title, callout = ("Result", "Result verified") if seg.kind == "outro" else ("Tip", "Tip from the documentation")
             else:
                 r = by_step[seg.step_id]
                 i = steps.index(r)

@@ -28,6 +28,7 @@ stages in background threads. No queues, microservices or cloud services except 
 | `db` | SQLite persistence, stage status, event log, TTS usage | project rows, stage rows |
 | `registry` | explicit list of apps/platforms/versions/workflows and their support status | → `AppEntry`, adapter |
 | `planning` | topic discovery, tutorial plan | `ProjectRequest` → `TutorialPlan` |
+| `research/*` + `llm/*` | fetch docs, quote-verified LLM findings, provider abstraction | `ProjectRequest`, URLs → `ResearchReport` (in `TutorialPlan.research`) |
 | `adapters/*` | app-specific: environment, version detection, end-state verification | `WorkflowSpec`, `EnvironmentRecord`, `Check` |
 | `demo_engine` | generic Playwright runner: isolation, recording, screenshots, step assertions | → `ExecutionResult` + `VerificationRecord` |
 | `manual_capture` | fallback: user recording + step marks + attestation → `ExecutionResult` (method `human_attested`) | upload → `ExecutionResult` |

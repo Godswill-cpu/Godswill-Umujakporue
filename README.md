@@ -38,6 +38,12 @@ Open http://127.0.0.1:8765. Everything else happens in the browser:
 6. Grant final approval → *Build export package* → download the ZIP (MP4, SRT, audio, YouTube metadata, thumbnail,
    QC report, version-verification record).
 
+### Research-assisted planning (optional)
+In **Settings**, choose *Anthropic (Claude)* as the AI provider and paste an API key. When creating a project,
+list documentation URLs (official help pages preferred). The app fetches them, asks the model for findings that
+each quote the page verbatim, and discards any finding whose quote is not actually on the page. Findings appear in
+*Research & planning*; troubleshooting findings can be added to the narration as clearly flagged tips.
+
 ### Software without an automation adapter (manual capture)
 Choose **Manual capture** on *Create video*, then on the project page upload your own screen recording, list
 when each step starts (`0:12 | Step title | narration`), fill in the version details you know and confirm the
@@ -60,6 +66,10 @@ Environment variables (or `.env`) override Settings-page values:
 | `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | — | Azure AI Speech credentials |
 | `STUDIO_MAX_TTS_CHARS_PER_PROJECT` | `20000` | cost limit (cached segments are not counted) |
 | `STUDIO_CHROMIUM_EXECUTABLE` | — | explicit Chromium path |
+| `STUDIO_LLM_PROVIDER` | `none` | `anthropic` enables AI research |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key (or set it in Settings) |
+| `STUDIO_LLM_MODEL` | `claude-opus-5-5` | model used for research |
+| `STUDIO_MAX_LLM_TOKENS_PER_PROJECT` | `300000` | AI research budget per project |
 
 ## Tests
 ```bash

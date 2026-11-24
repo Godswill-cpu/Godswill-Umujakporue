@@ -41,8 +41,8 @@ def build_plan(req: ProjectRequest) -> TutorialPlan:
         sources=wf.sources,
         warnings=warnings,
         generated_by="workflow-registry",
-        research_note="Plan taken from the tested adapter workflow definition. Automated web research and "
-                      "LLM-assisted planning are not implemented in this release; no external sources were consulted.",
+        research_note="Plan taken from the tested adapter workflow definition. No documentation research was "
+                      "performed for this project (add documentation URLs and configure an AI provider to enable it).",
     )
 
 

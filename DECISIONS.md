@@ -30,3 +30,14 @@ and attests that it shows each step succeeding. The verification record carries 
 QC adds a human-judgement warning and the YouTube description says "Recorded by the creator" instead of
 "Tested". Unknown environment fields stay unknown. Screenshots are frames of the uploaded recording only.
 Attestation is cleared whenever the recording, steps or environment details change.
+
+## D10 — Research findings must quote their fetched source verbatim
+The LLM only sees pages the app actually fetched. Each finding must include an exact quote; the app checks it
+(after whitespace/case/punctuation-icon normalisation) against the extracted page text and discards any finding
+that fails, listing it as a rejected claim. Findings are labelled "sourced, not demonstrated" and never change the
+tested steps. Discrepancies (e.g. different menu names) become plan warnings and QC items for human review.
+
+## D11 — Claude as the first LLM provider, behind `LLMProvider`
+`studio/llm/base.py` defines `structured(system, user, schema)`. The Anthropic implementation uses structured
+outputs (`beta.messages.parse`, pydantic schema), effort `high`, and server-side refusal fallbacks. Research
+results are cached by a hash of the prompt and sources; usage is recorded per project against a token budget.

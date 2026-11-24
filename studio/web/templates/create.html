@@ -23,6 +23,10 @@
 <div><label for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option>beginner</option><option>intermediate</option><option>advanced</option></select></div>
 <div><label for="resolution">Output resolution</label><select id="resolution" name="resolution"><option>1920x1080</option><option>1280x720</option></select></div>
 </div>
+<label for="source_urls">Documentation to research (optional, one https URL per line — official docs preferred)</label>
+<textarea id="source_urls" name="source_urls" placeholder="https://support.google.com/docs/answer/..."></textarea>
+<div class="muted small">Pages are fetched and analysed by the AI provider configured in Settings{% if not settings.llm_configured %} (<b>none configured — research will be skipped</b>){% endif %}. Every finding must quote its source verbatim; unsupported claims are discarded.</div>
+<label class="check"><input type="checkbox" name="include_tips" value="true" checked> Add sourced troubleshooting tips to the narration (flagged for your review)</label>
 <label for="instructions">Additional instructions (optional)</label><textarea id="instructions" name="instructions"></textarea>
 {% if settings.mode == 'development' %}<label class="check"><input type="checkbox" name="allow_dev_tts" value="true"> Allow the robotic <b>development</b> voice if Azure is not configured (output is watermarked and can never be published)</label>{% endif %}
 {% if not settings.azure_configured %}<div class="notice warn">Azure AI Speech is not configured, so production narration will fail until you add a key in <a href="/settings">Settings</a>.</div>{% endif %}

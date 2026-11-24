@@ -72,7 +72,7 @@ def test_registry_only_exposes_tested_adapters():
 def test_plan_is_honest_about_research_and_versions():
     plan = build_plan(req(target_version="9.9", instructions="Mention keyboard shortcuts"))
     assert plan.generated_by == "workflow-registry"
-    assert "no external sources" in plan.research_note
+    assert "No documentation research was performed" in plan.research_note
     assert all(s.status == "planned" for s in plan.steps)
     assert any("9.9" in w for w in plan.warnings) and any("instructions" in w for w in plan.warnings)
     assert all(src.kind != "official_docs" for src in plan.sources)  # nothing fabricated

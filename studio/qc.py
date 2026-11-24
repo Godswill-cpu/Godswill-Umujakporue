@@ -49,7 +49,27 @@ def run_qc(project_dir: Path, req: ProjectRequest, plan: TutorialPlan | None, ex
             if s.screenshot and not (project_dir / s.screenshot).exists():
                 add(f"shot-missing-{s.step_id}", "warning", "media", f"Screenshot missing for step '{s.title}'.")
 
-    if plan and plan.generated_by == "workflow-registry":
+    if plan and plan.research:
+        r = plan.research
+        if r.rejected:
+            add("research-rejected", "info", "research", f"{len(r.rejected)} AI-suggested claim(s) were discarded because "
+                "their quotes were not found in the sources.")
+        for f in r.findings:
+            if f.kind == "discrepancy":
+                add(f"research-discrepancy-{f.id}", "warning", "compatibility",
+                    f"Documentation differs from the tested workflow: {f.claim} [{f.source_id}]", automated=False)
+        if any(d.truncated for d in r.docs):
+            add("research-truncated", "info", "research", "Some long sources were truncated before analysis.")
+    if script:
+        for seg in script.segments:
+            if seg.kind == "tip":
+                f = next((x for x in (plan.research.findings if plan and plan.research else []) if x.id == seg.finding_id), None)
+                if not f:
+                    add(f"tip-unsourced-{seg.id}", "blocker", "claims", f"Tip '{seg.id}' has no matching sourced finding.")
+                else:
+                    add(f"tip-review-{seg.id}", "warning", "claims", f"Tip is sourced ({f.source_id}: \"{f.quote[:120]}\") but "
+                        "not demonstrated. Confirm the narration matches the quote.", automated=False)
+    if plan and plan.generated_by == "workflow-registry" and not plan.research:
         add("research-not-automated", "info", "research",
             "Plan came from the tested workflow definition; no external research was performed.")
 

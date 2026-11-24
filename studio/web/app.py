@@ -95,7 +95,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                target_os: str = Form("Any (browser-based)"), target_version: str = Form(""),
                target_duration_s: int = Form(90), voice: str = Form("en-US-AndrewNeural"),
                speaking_rate: int = Form(0), difficulty: str = Form("beginner"), resolution: str = Form("1920x1080"),
-               instructions: str = Form(""), allow_dev_tts: bool = Form(False), start: bool = Form(False)):
+               instructions: str = Form(""), allow_dev_tts: bool = Form(False), start: bool = Form(False),
+               source_urls: str = Form(""), include_tips: bool = Form(False)):
+        urls = [u.strip() for u in source_urls.splitlines() if u.strip()]
+        bad = [u for u in urls if not u.startswith("https://")]
+        if bad:
+            raise HTTPException(400, f"Documentation URLs must start with https://: {bad[0]}")
         if capture_mode == "manual":
             if not topic.strip() or not manual_app_name.strip():
                 raise HTTPException(400, "Manual capture needs a topic and the application name.")
@@ -112,7 +117,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                              target_version=target_version.strip(), target_duration_s=max(15, min(target_duration_s, 1800)),
                              voice=voice, speaking_rate=max(-30, min(speaking_rate, 30)), difficulty=difficulty,
                              resolution=resolution, instructions=instructions,
-                             allow_dev_tts=bool(allow_dev_tts) and settings.mode == "development")
+                             allow_dev_tts=bool(allow_dev_tts) and settings.mode == "development",
+                             source_urls=urls[:8], include_tips=bool(include_tips))
         pid = db.create_project(req.topic, req)
         db.log(pid, f"Project created ({req.capture_mode} capture, workflow {wf_id})")
         if start and req.capture_mode == "manual":
@@ -357,17 +363,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/settings")
     def save_settings(azure_key: str = Form(""), azure_region: str = Form(""), clear_key: bool = Form(False),
-                      max_chars: int = Form(20000), mode: str = Form("development")):
+                      max_chars: int = Form(20000), mode: str = Form("development"),
+                      llm_provider: str = Form("none"), anthropic_key: str = Form(""), clear_anthropic_key: bool = Form(False),
+                      llm_model: str = Form("claude-opus-5-5"), max_llm_tokens: int = Form(300000)):
         if clear_key:
             save_secret(settings.data_dir, "AZURE_SPEECH_KEY", "")
         elif azure_key.strip():
             save_secret(settings.data_dir, "AZURE_SPEECH_KEY", azure_key.strip())
-        prefs = {"STUDIO_MAX_TTS_CHARS_PER_PROJECT": max(0, max_chars), "STUDIO_MODE": mode}
+        if clear_anthropic_key:
+            save_secret(settings.data_dir, "ANTHROPIC_API_KEY", "")
+        elif anthropic_key.strip():
+            save_secret(settings.data_dir, "ANTHROPIC_API_KEY", anthropic_key.strip())
+        prefs = {"STUDIO_MAX_TTS_CHARS_PER_PROJECT": max(0, max_chars), "STUDIO_MODE": mode,
+                 "STUDIO_LLM_PROVIDER": llm_provider if llm_provider in ("none", "anthropic") else "none",
+                 "STUDIO_LLM_MODEL": llm_model.strip() or "claude-opus-5-5",
+                 "STUDIO_MAX_LLM_TOKENS_PER_PROJECT": max(0, max_llm_tokens)}
         if azure_region.strip():
             prefs["AZURE_SPEECH_REGION"] = azure_region.strip()
         save_preferences(settings.data_dir, prefs)
         fresh = load_settings({**__import__("os").environ, "STUDIO_DATA_DIR": str(settings.data_dir)})
-        for field in ("azure_speech_key", "azure_speech_region", "max_tts_chars_per_project", "mode"):
+        for field in ("azure_speech_key", "azure_speech_region", "max_tts_chars_per_project", "mode", "llm_provider",
+                      "anthropic_api_key", "llm_model", "max_llm_tokens_per_project"):
             setattr(settings, field, getattr(fresh, field))
         return RedirectResponse("/settings?saved=1", status_code=303)
 

@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, SecretStr
 
-SECRET_KEYS = {"AZURE_SPEECH_KEY"}
+SECRET_KEYS = {"AZURE_SPEECH_KEY", "ANTHROPIC_API_KEY"}
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
@@ -40,6 +40,14 @@ class Settings(BaseModel):
     max_tts_chars_per_project: int = 20000
     chromium_executable: str | None = None
     browser_headless: bool = True
+    llm_provider: Literal["none", "anthropic"] = "none"
+    anthropic_api_key: SecretStr | None = None
+    llm_model: str = "claude-opus-5-5"
+    max_llm_tokens_per_project: int = 300000
+
+    @property
+    def llm_configured(self) -> bool:
+        return self.llm_provider == "anthropic" and bool(self.anthropic_api_key and self.anthropic_api_key.get_secret_value())
 
     @property
     def azure_configured(self) -> bool:
@@ -68,6 +76,10 @@ class Settings(BaseModel):
             "azure_speech_region": self.azure_speech_region or "not configured",
             "max_tts_chars_per_project": self.max_tts_chars_per_project,
             "chromium_executable": self.chromium_executable or "(Playwright default)",
+            "llm_provider": self.llm_provider,
+            "anthropic_api_key": "configured" if self.anthropic_api_key and self.anthropic_api_key.get_secret_value() else "not configured",
+            "llm_model": self.llm_model,
+            "max_llm_tokens_per_project": self.max_llm_tokens_per_project,
         }
 
 
@@ -86,7 +98,12 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         return prefs.get(key, default)
 
     key = get("AZURE_SPEECH_KEY")
+    akey = get("ANTHROPIC_API_KEY")
     return Settings(
+        llm_provider=(get("STUDIO_LLM_PROVIDER", "none") or "none").lower(),
+        anthropic_api_key=SecretStr(akey) if akey else None,
+        llm_model=get("STUDIO_LLM_MODEL", "claude-opus-5-5") or "claude-opus-5-5",
+        max_llm_tokens_per_project=int(get("STUDIO_MAX_LLM_TOKENS_PER_PROJECT", 300000)),
         mode=(get("STUDIO_MODE", "development") or "development").lower(),
         data_dir=data_dir,
         host=get("STUDIO_HOST", "127.0.0.1"),
@@ -124,8 +141,7 @@ def save_preferences(data_dir: Path, updates: dict) -> None:
 
 def redact(text: str, settings: Settings) -> str:
     """Remove secret values from arbitrary text (used for logs and error messages)."""
-    if settings.azure_speech_key:
-        secret = settings.azure_speech_key.get_secret_value()
-        if secret:
-            text = text.replace(secret, "***")
+    for sec in (settings.azure_speech_key, settings.anthropic_api_key):
+        if sec and sec.get_secret_value():
+            text = text.replace(sec.get_secret_value(), "***")
     return text

@@ -1,6 +1,6 @@
 # Status — 2026-11-24
 
-**Current phase:** Phase 1 and Phase 2 complete (incl. manual-capture fallback). Phase 3 vertical slice implemented and tested *except* a live
+**Current phase:** Phase 1 and Phase 2 complete (incl. manual-capture fallback). Phase 3 mostly implemented (research-assisted planning added); vertical slice implemented and tested *except* a live
 Azure Neural TTS run (no credentials available in the development environment).
 
 Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voice for narration).
@@ -26,22 +26,26 @@ Test suite: `pytest -q` → **31 passed** (real Chromium + real FFmpeg; dev voic
 | QC: media validity, demo failures, missing steps, missing narration, dev voice, sync, silence, caption timing, resolution, duration, repetition, licensing note, human-judgement items | e2e |
 | Publishing gate (verified demo, no QC blockers, production narration approved, version ack) | `test_narration_policy`, e2e negative |
 | Manual-capture fallback: upload own recording, mark steps, enter environment, attest; frames extracted from the recording; verification labelled `human_attested`; any change clears attestation; 4:3 etc. padded not stretched | `test_manual_capture` |
+| Research-assisted planning: fetches real documentation (https only, size limits), extracts text, asks the LLM for findings with verbatim quotes, **keeps only findings whose quote is found in the fetched source**, reports discarded claims, discrepancies with the tested workflow and uncertain statements; cached; per-project token budget | `test_research` (labeled fake LLM + real fetch of an official Google help page) |
+| Sourced troubleshooting tips in narration (by difficulty), shown over the verified final state, flagged for human review in QC | `test_research` |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
 - **Azure Neural TTS provider** (`studio/tts/azure.py`, official Speech SDK, SSML, word-boundary timings,
   retries, auth errors). Only provider selection is tested. Needs a real key to validate. **Blocked on credentials.**
+- **Anthropic (Claude) provider** for research (`studio/llm/anthropic_provider.py`: official SDK, structured outputs via `beta.messages.parse`, server-side refusal fallbacks, typed error handling). No API key in the dev environment, so it has never run live. **Blocked on credentials.**
 - Voice preview endpoint with Azure (works with dev voice).
 - Export package + thumbnail: code path only reachable after Azure narration is approved, so not yet exercised end to end.
 - Reverification list on the registry page (simple rules: >90 days, unknown version, version no longer tested).
 
 ## Partially implemented
-- Research: plans come from the adapter's workflow definition; no web research or LLM planning.
-- Script adaptation: difficulty only; no LLM rewriting, no troubleshooting section generation.
+- Research uses only URLs the user lists (plus registry doc URLs, none configured yet); there is no automatic source discovery/web search.
+- Research does not change the tested step sequence; it annotates it (notes, prerequisites, discrepancies, tips).
+- Script adaptation: difficulty level + sourced tips; no LLM rewriting of narration.
 - Captions timed by character share when word timings are absent (dev voice); Azure word timings used when present.
 
 ## Planned (not started)
-- Provider-agnostic LLM integration (research-assisted planning, adaptive scripts).
+- Automatic documentation discovery (web search) and LLM-assisted script polishing.
 - Additional adapters (Google Sheets with test account first); desktop automation adapters.
 - Optional authorized YouTube upload.
 - Automation-time measurement (needed before any claim about the 85% target).

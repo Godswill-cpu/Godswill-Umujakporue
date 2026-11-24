@@ -44,6 +44,9 @@ class ProjectRequest(BaseModel):
     capture_mode: Literal["automated", "manual"] = "automated"
     manual_app_name: str = ""
     manual_steps: list[ManualStep] = Field(default_factory=list)
+    # Documentation pages to research (fetched for real; claims must quote them verbatim).
+    source_urls: list[str] = Field(default_factory=list)
+    include_tips: bool = True
 
     @property
     def size(self) -> tuple[int, int]:
@@ -89,6 +92,48 @@ class WorkflowSpec(BaseModel):
     outro: str
 
 
+# --------------------------------------------------------------- research ---
+class ResearchDoc(BaseModel):
+    id: str
+    title: str
+    url: str
+    kind: Literal["official_docs", "bundled_test_app", "community", "other"]
+    fetched_at: str
+    sha256: str
+    chars: int
+    truncated: bool = False
+    local_path: str  # project-relative copy of the extracted text
+
+
+class ResearchFinding(BaseModel):
+    id: str
+    kind: Literal["prerequisite", "step_note", "troubleshooting", "version_note", "discrepancy"]
+    claim: str
+    source_id: str
+    quote: str  # verified to occur verbatim (whitespace/case-normalised) in the fetched source
+    step_id: str | None = None
+    status: Literal["sourced"] = "sourced"  # sourced != demonstrated
+
+
+class RejectedClaim(BaseModel):
+    claim: str
+    reason: str
+
+
+class ResearchReport(BaseModel):
+    provider: str
+    model: str
+    docs: list[ResearchDoc]
+    findings: list[ResearchFinding]
+    rejected: list[RejectedClaim] = Field(default_factory=list)
+    uncertain: list[str] = Field(default_factory=list)
+    fetch_errors: list[str] = Field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached: bool = False
+    created_at: str = Field(default_factory=now_iso)
+
+
 # --------------------------------------------------------------- planning ---
 class PlanStep(BaseModel):
     step_id: str
@@ -108,6 +153,7 @@ class TutorialPlan(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     generated_by: str
     research_note: str
+    research: ResearchReport | None = None
     created_at: str = Field(default_factory=now_iso)
 
 
@@ -171,8 +217,9 @@ class ExecutionResult(BaseModel):
 # ----------------------------------------------------------------- script ---
 class ScriptSegment(BaseModel):
     id: str
-    kind: Literal["intro", "step", "outro"]
+    kind: Literal["intro", "step", "tip", "outro"]
     step_id: str | None = None
+    finding_id: str | None = None  # for "tip": the sourced research finding it states
     text: str
 
 
