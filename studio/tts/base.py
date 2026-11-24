@@ -44,18 +44,26 @@ class TTSProvider(ABC):
         return hashlib.sha256(payload.encode()).hexdigest()[:24]
 
 
+def _term_pattern(terms) -> re.Pattern | None:
+    """One alternation, longest terms first, so every match is replaced exactly once (no nested substitutions)."""
+    terms = [t for t in sorted(terms, key=len, reverse=True) if t]
+    if not terms:
+        return None
+    return re.compile(r"(?<!\w)(" + "|".join(re.escape(t) for t in terms) + r")(?!\w)")
+
+
 def apply_pronunciations_plain(text: str, pronunciations: dict[str, str]) -> str:
-    for term, spoken in pronunciations.items():
-        text = re.sub(rf"\b{re.escape(term)}\b", spoken, text)
-    return text
+    pat = _term_pattern(pronunciations)
+    return pat.sub(lambda m: pronunciations[m.group(1)], text) if pat else text
 
 
 def build_ssml(text: str, voice: str, rate: int, pronunciations: dict[str, str], locale: str = "en-US") -> str:
     """SSML with per-term <sub> pronunciation aliases and short pauses between sentences."""
+    escaped = {escape(t): (t, a) for t, a in pronunciations.items()}
     body = escape(text)
-    for term, spoken in sorted(pronunciations.items(), key=lambda kv: -len(kv[0])):
-        body = re.sub(rf"\b{re.escape(escape(term))}\b",
-                      f'<sub alias="{escape(spoken, {chr(34): "&quot;"})}">{escape(term)}</sub>', body)
+    pat = _term_pattern(escaped)
+    if pat:
+        body = pat.sub(lambda m: f'<sub alias="{escape(escaped[m.group(1)][1], {chr(34): "&quot;"})}">{m.group(1)}</sub>', body)
     body = re.sub(r"([.!?])\s+(?=[A-Z])", r'\1 <break time="350ms"/> ', body)
     return (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
             f'xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="{locale}">'

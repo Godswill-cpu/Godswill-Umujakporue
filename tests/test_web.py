@@ -34,3 +34,24 @@ def test_settings_never_echo_secret(client, settings):
 
 def test_media_path_traversal_blocked(client):
     assert client.get("/media/abc/../../secrets.env").status_code == 404
+
+
+def test_unmatched_topic_is_refused_not_substituted(client):
+    """A topic without a tested recipe must never produce a different tutorial under the user's title."""
+    before = len(client.app_state.db.list_projects())
+    r = client.post("/create", data={"topic": "How to run a CVS file on JupyterLab", "workflow_id": "jupyterlab.first-notebook"})
+    assert r.status_code == 200 and "No tested recipe for this topic yet" in r.text
+    assert "/create?mode=manual&topic=How%20to%20run%20a%20CVS%20file%20on%20JupyterLab" in r.text
+    assert len(client.app_state.db.list_projects()) == before
+    # manual-capture link prefills the form
+    form = client.get("/create?mode=manual&topic=How%20to%20run%20a%20CVS%20file%20on%20JupyterLab").text
+    assert 'value="How to run a CVS file on JupyterLab"' in form and 'value="manual" checked' in form
+
+
+def test_matching_topic_variants_accepted(client):
+    from studio.planning import topic_matches_workflow as m
+    t = "How to Create and Run Your First Notebook in JupyterLab"
+    assert m(t, t) and m("create and run your first notebook in JupyterLab - tutorial", t)
+    assert not m("How to run a CSV file on JupyterLab", t) and not m("", t)
+    r = client.post("/create", data={"topic": "", "workflow_id": "jupyterlab.first-notebook"}, follow_redirects=False)
+    assert r.status_code == 303

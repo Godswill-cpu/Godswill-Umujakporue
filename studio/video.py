@@ -135,7 +135,9 @@ def render_scene(source: Path, scene: Scene, out: Path, src_size: tuple[int, int
           + (",fade=t=in:st=0:d=0.35" if fade_in else ""))
     if scene.callout:
         s = h / 1080
-        vf += "," + _drawtext(scene.callout, int(32 * s), f"{int(h*0.15)}", x=f"w-text_w-{int(48*s)}", box=True, bold=True)
+        # lower-left label, shown only at the start of the step so it never hides content for long
+        vf += "," + _drawtext(scene.callout, int(30 * s), f"{int(h*0.74)}", x=f"{int(48*s)}", box=True, bold=True) \
+            + ":enable='lt(t,4)'"
     args = ["-i", str(source)]
     if scene.audio:
         args += ["-i", str(scene.audio)]

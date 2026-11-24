@@ -3,7 +3,7 @@
 **Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **51 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **55 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Live acceptance test (§14) — PASSED 2026-11-24
 `scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
@@ -24,6 +24,11 @@ Same dashboard-driven script (`--workflow jupyterlab.first-notebook --voice en-U
 Azure narration: real JupyterLab server and Python kernel, 9 steps, 5 independent checks via the Jupyter Contents
 API (notebook saved, typed code, real kernel output, Python kernel, no Untitled left), 96 s 1080p video, 0 QC
 warnings, export complete. 13/13 steps passed (approval clicks again made by the script).
+
+## Third live run — JupyterLab "How to Open a CSV File" — PASSED 2026-11-24
+Added after a user asked for that topic. Synthetic sales.csv; open in the CSV viewer, load with pandas, name and save.
+7 independent checks (CSV unchanged, notebook saved under its name, code, kernel ran without errors, every column and
+exactly the first five rows in the real output). Live Azure narration with recipe pronunciations; 115 s; 0 QC warnings.
 
 ## Implemented and tested
 | Area | Evidence |
@@ -54,6 +59,7 @@ warnings, export complete. 13/13 steps passed (approval clicks again made by the
 | One-command install/start (`install.sh`/`start.sh`; `install.ps1`/`start.bat` for Windows) | install.sh + start.sh run from a clean copy; Windows `install.bat`/`install.ps1`/`start.bat` rewritten after a user report; **not run on Windows** (no Windows host; PowerShell not available here) |
 | Reverification: re-runs a produced tutorial's workflow without touching the approved video; records version/build/edition/browser changes and failures; registry lists tutorials needing attention | `test_reverification` |
 | **JupyterLab adapter** (real third-party app): per-run isolated server (localhost, empty temp folder, terminals off, news/update checks off), version detection from the app (appVersion, jupyter_server, kernel), API-based verification, renamed-command detection, server always shut down | `test_jupyterlab` + live acceptance run |
+| Topics without a tested recipe are refused with options (manual capture prefilled, closest recipes) instead of silently demonstrating a different workflow | `test_web` |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
@@ -69,6 +75,8 @@ warnings, export complete. 13/13 steps passed (approval clicks again made by the
 - Captions timed by character share when word timings are absent (dev voice); Azure word timings used when present.
 
 ## Planned (not started)
+- **AI-generated recipes** (type any topic for a supported app → AI drafts steps + machine checks from docs → real
+  execution → kept only if every check passes). Needs explicit user approval (major feature) and an Anthropic key.
 - Automatic documentation discovery (web search) and LLM-assisted script polishing.
 - Additional adapters (Google Sheets with test account first); desktop automation adapters.
 - Optional authorized YouTube upload.
@@ -78,8 +86,13 @@ warnings, export complete. 13/13 steps passed (approval clicks again made by the
 - 2026-11-24, Windows: video assembly crashed FFmpeg (Fontconfig, no font file). Fixed (D18); fix verified on Linux
   with Windows-style problem paths, **not yet confirmed on the user's Windows PC**.
 
+- 2026-11-24: user typed a topic with no recipe and got a different tutorial under their title. Fixed: such topics
+  are now refused with options (D19).
+
 ## Known limitations
 - Supported apps: the bundled Studio Sandbox Sheet (test app) and **JupyterLab 4** (real). Excel desktop is unavailable
   in the dev container; Google Sheets needs a dedicated test account.
 - YouTube chapters are merged to satisfy YouTube's rules (≥3 chapters, each ≥10 s); the review page keeps every scene.
 - No claim about the 85% automation target can be made yet.
+- Browser timing: under heavy CPU load (e.g. a render running in parallel) a JupyterLab step can exceed its timeout;
+  the run then stops safely as failed. Retry when the machine is idle.

@@ -59,6 +59,11 @@ class AzureTTSProvider(TTSProvider):
     def synthesize(self, text, voice, rate, pronunciations, out_path: Path) -> SynthesisResult:
         locale = "-".join(voice.split("-")[:2]) if voice.count("-") >= 2 else "en-US"
         ssml = build_ssml(text, voice, rate, pronunciations, locale)
+        try:
+            import xml.dom.minidom
+            xml.dom.minidom.parseString(ssml)
+        except Exception as e:
+            raise TTSError(f"Internal error: the narration markup (SSML) is invalid ({e}). Check pronunciation entries.") from None
         if self.transport in ("auto", "sdk"):
             try:
                 return self._with_retries(lambda: self._sdk(ssml, out_path))

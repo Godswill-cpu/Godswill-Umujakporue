@@ -95,13 +95,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     portfolio=metrics.portfolio_metrics(db, projects))
 
     @app.get("/create", response_class=HTMLResponse)
-    def create_form(request: Request, workflow: str | None = None):
+    def create_form(request: Request, workflow: str | None = None, topic: str = "", mode: str = "automated"):
         return page(request, "create.html", apps=APPS, workflows=supported_workflows(), selected=workflow,
+                    prefill_topic=topic, prefill_mode=mode,
                     voices=__import__("studio.tts.azure", fromlist=["AZURE_VOICES"]).AZURE_VOICES,
                     discovered=planning.discover_topics())
 
     @app.post("/create")
-    def create(request: Request, topic: str = Form(...), workflow_id: str = Form(""), capture_mode: str = Form("automated"),
+    def create(request: Request, topic: str = Form(""), workflow_id: str = Form(""), capture_mode: str = Form("automated"),
                manual_app_name: str = Form(""),
                target_os: str = Form("Any (browser-based)"), target_version: str = Form(""),
                target_duration_s: int = Form(90), voice: str = Form("en-US-AndrewNeural"),
@@ -123,6 +124,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise HTTPException(400, "Choose a supported workflow, or use manual capture. "
                                          "Unsupported applications cannot be automated.")
             app_id, wf_id, default_title = wf.app_id, wf.id, wf.title
+            if topic.strip() and not planning.topic_matches_workflow(topic, wf.title):
+                # Never silently demonstrate a different workflow under the user's title.
+                return page(request, "no_recipe.html", topic=topic.strip(), selected=wf,
+                            suggestions=planning.closest_workflows(topic))
         req = ProjectRequest(topic=topic.strip() or default_title, app_id=app_id, workflow_id=wf_id,
                              capture_mode="manual" if capture_mode == "manual" else "automated",
                              manual_app_name=manual_app_name.strip()[:120], target_os=target_os,

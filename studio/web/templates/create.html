@@ -4,15 +4,16 @@
 {% for t in discovered %}<div><a href="/create?workflow={{ t.workflow_id }}">{{ t.topic }}</a> <span class="muted small">— {{ t.summary }}</span></div>{% endfor %}</div>
 <form class="card" method="post" action="/create"><h2>Tutorial details</h2>
 <label for="topic">Tutorial topic</label><input type="text" id="topic" name="topic" required placeholder="How to Remove Duplicate Rows from a Spreadsheet"
- value="{% for w in workflows %}{% if w.id==selected %}{{ w.title }}{% endif %}{% endfor %}">
+ value="{% if prefill_topic %}{{ prefill_topic }}{% else %}{% for w in workflows %}{% if w.id==selected %}{{ w.title }}{% endif %}{% endfor %}{% endif %}">
+<div class="muted small" id="topic-help">For automated videos the topic must match a tested recipe (choosing one below fills this in). For anything else, choose <b>Manual capture</b>.</div>
 <label>Capture method</label>
-<label class="check"><input type="radio" name="capture_mode" value="automated" checked onchange="mode()"> Automated demonstration (tested adapter)</label>
-<label class="check"><input type="radio" name="capture_mode" value="manual" onchange="mode()"> Manual capture — I will upload my own screen recording (for software without an adapter)</label>
+<label class="check"><input type="radio" name="capture_mode" value="automated" {{ 'checked' if prefill_mode != 'manual' }} onchange="mode()"> Automated demonstration (tested adapter)</label>
+<label class="check"><input type="radio" name="capture_mode" value="manual" {{ 'checked' if prefill_mode == 'manual' }} onchange="mode()"> Manual capture — I will upload my own screen recording (for software without an adapter)</label>
 <div id="manual-fields" style="display:none"><label for="manual_app_name">Application name</label>
 <input type="text" id="manual_app_name" name="manual_app_name" placeholder="e.g. Microsoft Excel for Windows">
 <div class="notice warn small">Manual recordings are verified by your attestation, not automatically. You will upload the video and mark step times on the project page.</div></div>
 <div class="row">
-<div id="auto-fields"><label for="workflow_id">Target software and workflow</label><select id="workflow_id" name="workflow_id">
+<div id="auto-fields"><label for="workflow_id">Target software and workflow</label><select id="workflow_id" name="workflow_id" onchange="pickRecipe(this)">
 {% for w in workflows %}{% set app = (apps|selectattr('id','equalto',w.app_id)|first) %}<option value="{{ w.id }}" {{ 'selected' if w.id==selected }} {{ 'disabled' if app and not app.available }}>{{ w.title }} — {{ app.name if app else w.app_id }}{{ ' (not installed)' if app and not app.available }}</option>{% endfor %}</select>
 <div class="muted small">Only applications with a tested adapter are listed. <a href="/registry">See all applications</a>.</div></div>
 <div><label for="target_os">Target operating system</label><input type="text" id="target_os" name="target_os" value="Any (browser-based)"></div>
@@ -36,5 +37,8 @@
 <p><button class="primary" type="submit">Create project</button></p></form>
 <script>function mode(){const m=document.querySelector('input[name=capture_mode]:checked').value==='manual';
 document.getElementById('manual-fields').style.display=m?'block':'none';document.getElementById('auto-fields').style.display=m?'none':'block';
-document.getElementById('manual_app_name').required=m;}</script>
+document.getElementById('manual_app_name').required=m;}
+const titles={ {% for w in workflows %}"{{ w.id }}": {{ w.title|tojson }},{% endfor %} };
+function pickRecipe(sel){document.getElementById('topic').value=titles[sel.value]||'';}
+mode();</script>
 {% endblock %}

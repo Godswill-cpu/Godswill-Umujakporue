@@ -19,7 +19,7 @@ class AppAdapter(ABC):
     @abstractmethod
     def workflows(self) -> dict[str, WorkflowSpec]: ...
 
-    def setup_environment(self, work_dir, log) -> None:
+    def setup_environment(self, work_dir, log, workflow=None) -> None:
         """Start the isolated test environment (e.g. a local server with synthetic data). Default: nothing."""
 
     def teardown_environment(self, log) -> None:

@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}No tested recipe{% endblock %}{% block body %}
+<h1>No tested recipe for this topic yet</h1>
+<div class="card">
+<p>You asked for: <b>{{ topic }}</b></p>
+<p>The app can only demonstrate software automatically when it has a <b>tested recipe</b> for that exact task. A recipe
+is a step-by-step automation that has been run and verified in the real application. There is no recipe for your
+topic yet, so the app did <b>not</b> create a project. It will never show a different tutorial under your title.</p>
+</div>
+<div class="card"><h2>Your options</h2>
+<h3>1. Record it yourself (works for any topic, any software)</h3>
+<p class="small">Upload your own screen recording. The app writes the narration, voices it, edits the video,
+adds captions and prepares YouTube metadata.</p>
+<p><a class="btn primary" href="/create?mode=manual&topic={{ topic|urlencode }}">Use manual capture for &ldquo;{{ topic }}&rdquo;</a></p>
+<h3>2. Use a tested recipe instead</h3>
+<table class="small">{% for s in suggestions %}<tr><td><b>{{ s.workflow.title }}</b><div class="muted">{{ s.workflow.summary }}</div></td>
+<td>{% if s.shared_words %}{{ s.shared_words }} word(s) in common with your topic{% else %}<span class="muted">unrelated</span>{% endif %}</td>
+<td><a class="btn" href="/create?workflow={{ s.workflow.id }}">Use this recipe</a></td></tr>{% endfor %}</table>
+<h3>3. Ask for a new recipe</h3>
+<p class="small muted">New recipes are added and tested by the developer. Automatic AI-generated recipes are not available yet.</p>
+</div>
+{% endblock %}

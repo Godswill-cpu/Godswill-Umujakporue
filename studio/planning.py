@@ -57,3 +57,28 @@ def _manual_plan(req: ProjectRequest) -> TutorialPlan:
         steps=[PlanStep(step_id=s.id, title=s.title, expected=s.expected, source_ids=s.source_ids) for s in wf.steps],
         sources=wf.sources, warnings=warnings, generated_by="user (manual capture)",
         research_note="Steps were entered by the user for their own recording. No automated research was performed.")
+
+
+_STOP = {"how", "to", "a", "an", "the", "in", "on", "with", "and", "your", "you", "for", "of", "using", "use", "from", "my"}
+
+
+def _words(text: str) -> set[str]:
+    import re
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _STOP}
+
+
+def topic_matches_workflow(topic: str, workflow_title: str) -> bool:
+    """True when the topic is (essentially) the tested workflow's own title."""
+    t, w = _words(topic), _words(workflow_title)
+    return bool(t) and t <= w | {"tutorial", "beginners", "beginner", "guide", "step", "steps"}
+
+
+def closest_workflows(topic: str, limit: int = 3) -> list[dict]:
+    """Rank tested workflows by word overlap with a free-text topic (no AI, no claims of relevance beyond that)."""
+    t = _words(topic)
+    scored = []
+    for wf in supported_workflows():
+        overlap = t & (_words(wf.title) | _words(wf.summary))
+        scored.append((len(overlap), wf))
+    scored.sort(key=lambda x: -x[0])
+    return [{"workflow": wf, "shared_words": n} for n, wf in scored[:limit]]

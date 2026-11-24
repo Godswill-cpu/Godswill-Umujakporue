@@ -138,7 +138,7 @@ def test_research_flows_into_plan_script_and_qc(client):
 
 
 def test_urls_must_be_https(client):
-    r = client.post("/create", data={"topic": "t", "workflow_id": WF, "source_urls": "http://insecure.test/x"})
+    r = client.post("/create", data={"topic": "", "workflow_id": WF, "source_urls": "http://insecure.test/x"})
     assert r.status_code == 400
 
 

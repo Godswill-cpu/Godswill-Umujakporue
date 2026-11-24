@@ -70,3 +70,15 @@ def test_gate_blocks(kw, needle):
 def test_unknown_version_can_be_acknowledged():
     ex, nar, ren, qc = _stage_outputs(version=None)
     assert check_gate(ex, nar, ren, qc, Approval(narration_approved_at="n", version_limitation_acknowledged=True)) == []
+
+
+def test_overlapping_pronunciations_never_nest():
+    """Regression: 'df' inside 'df.head()' was substituted twice, producing invalid SSML (Azure HTTP 400)."""
+    import xml.dom.minidom
+    from studio.tts.base import apply_pronunciations_plain
+    p = {"pd.read_csv": "p d dot read C S V", "df.head()": "d f dot head", "df": "d f", "pd": "p d"}
+    text = "Type df equals pd.read_csv, then df.head() & pd."
+    ssml = build_ssml(text, "en-US-AndrewNeural", 0, p)
+    xml.dom.minidom.parseString(ssml)
+    assert ssml.count("<sub ") == 4 and "<sub alias=\"d f\"><sub" not in ssml
+    assert apply_pronunciations_plain(text, p) == "Type d f equals p d dot read C S V, then d f dot head & p d."

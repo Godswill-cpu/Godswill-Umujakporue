@@ -16,7 +16,7 @@ class ModifiedSandbox(SandboxSheetAdapter):
 
 
 def produced_project(client):
-    r = client.post("/create", data={"topic": "t", "workflow_id": WF, "resolution": "1280x720"}, follow_redirects=False)
+    r = client.post("/create", data={"topic": "", "workflow_id": WF, "resolution": "1280x720"}, follow_redirects=False)
     pid = r.headers["location"].rsplit("/", 1)[1]
     pipe = client.app_state.pipeline
     pipe.stage_plan(pid)
@@ -51,6 +51,6 @@ def test_reverification_unchanged_changed_and_broken(client, tmp_path, monkeypat
 
 
 def test_reverify_endpoint_guards(client):
-    r = client.post("/create", data={"topic": "t", "workflow_id": WF}, follow_redirects=False)
+    r = client.post("/create", data={"topic": "", "workflow_id": WF}, follow_redirects=False)
     pid = r.headers["location"].rsplit("/", 1)[1]
     assert client.post(f"/projects/{pid}/reverify").status_code == 400  # nothing produced yet

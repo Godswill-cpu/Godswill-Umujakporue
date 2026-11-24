@@ -113,6 +113,99 @@ FIRST_NOTEBOOK = WorkflowSpec(
 )
 
 
+# ---------------------------------------------------------------- CSV workflow
+CSV_NAME = "sales.csv"
+# Synthetic, non-personal sample data written into the empty test folder before each run.
+CSV_ROWS = [
+    ["order_id", "date", "region", "product", "units", "unit_price"],
+    ["1001", "2026-01-05", "North", "Notebook", "12", "3.50"],
+    ["1002", "2026-01-05", "South", "Pen", "40", "1.20"],
+    ["1003", "2026-01-06", "East", "Stapler", "5", "8.99"],
+    ["1004", "2026-01-07", "West", "Notebook", "8", "3.50"],
+    ["1005", "2026-01-07", "North", "Marker", "25", "2.10"],
+    ["1006", "2026-01-08", "South", "Stapler", "3", "8.99"],
+    ["1007", "2026-01-09", "East", "Pen", "60", "1.20"],
+    ["1008", "2026-01-10", "West", "Marker", "14", "2.10"],
+]
+CSV_TEXT = "\n".join(",".join(r) for r in CSV_ROWS) + "\n"
+CSV_CODE = 'import pandas as pd\ndf = pd.read_csv("sales.csv")\ndf.head()'
+CSV_NOTEBOOK = "sales-analysis.ipynb"
+CSV_TAB_JS = TAB_JS.replace(NOTEBOOK_NAME, CSV_NAME)
+CSV_NB_TAB_JS = TAB_JS.replace(NOTEBOOK_NAME, CSV_NOTEBOOK)
+TABLE_OUTPUT_JS = "() => !!document.querySelector('.jp-NotebookPanel .jp-OutputArea-output table')"
+
+OPEN_CSV = WorkflowSpec(
+    id="jupyterlab.open-csv",
+    app_id="jupyterlab",
+    title="How to Open a CSV File in JupyterLab",
+    summary="Open a CSV file in JupyterLab's table viewer, then load it into a notebook with pandas and preview the first rows.",
+    prerequisites=["JupyterLab 4 with a Python 3 (ipykernel) kernel and the pandas library.",
+                   "A CSV file in the folder JupyterLab is showing."],
+    sources=[*SOURCES, Source(id="pandas-read-csv", title="pandas documentation: pandas.read_csv",
+                              url="https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html", kind="official_docs")],
+    verification="The CSV must open in JupyterLab's CSV viewer; the saved notebook, read back through the Jupyter Contents "
+                 "API, must contain the read_csv code and a kernel-produced table showing the file's header and exactly its "
+                 "first five rows; the CSV file must be unchanged.",
+    intro="In this tutorial you'll open a CSV file in JupyterLab {app_version} in two ways: as a quick table view, and in "
+          "a notebook with pandas, so you can start working with the data. Our example is a small sales file with "
+          "{csv_rows} rows.",
+    outro="That's it. You've viewed {csv_name} as a table and loaded it into a pandas DataFrame, where df.head() showed "
+          "the first five of its {csv_rows} rows, and your work is saved as {csv_notebook}. From here you can sort, filter and analyse the data.",
+    pronunciations={"pd.read_csv": "p d dot read C S V", "df.head()": "d f dot head", "df": "d f", "pd": "p d"},
+    steps=[
+        StepSpec(id="open-csv", title="Open the CSV file", action="dblclick",
+                 selector=f'.jp-DirListing-item[title^="Name: {CSV_NAME}"]',
+                 expected="The file opens as a table in JupyterLab's CSV viewer.", expect_selector=".jp-CSVViewer",
+                 expect_js=CSV_TAB_JS, timeout_ms=20000,
+                 narration="Your CSV file is in the file browser on the left. Double-click {csv_name}. JupyterLab opens it "
+                           "as a table, so you can check the columns: {csv_columns}.",
+                 beginner_note="This view is read-only and is great for a quick look at the data.",
+                 zoom=True, pause_after_ms=2500, source_ids=["jl-files"]),
+        StepSpec(id="back-to-launcher", title="Go back to the Launcher", action="click",
+                 selector='.lm-DockPanel-tabBar .lm-TabBar-tab:has-text("Launcher")',
+                 expected="The Launcher is shown.", expect_selector='.jp-LauncherCard[data-category="Notebook"]',
+                 narration="To work with the data, we'll use a notebook. Switch back to the Launcher tab.",
+                 zoom=True, pause_after_ms=900, source_ids=["jl-notebooks"]),
+        StepSpec(id="new-notebook", title="Create a new notebook", action="click",
+                 selector='.jp-LauncherCard[data-category="Notebook"]',
+                 expected="A new notebook opens and its Python kernel is ready.",
+                 expect_selector=".jp-NotebookPanel .jp-Cell .cm-content", expect_js=KERNEL_IDLE_JS, timeout_ms=45000,
+                 narration="Under Notebook, click Python 3 to create a new notebook in the same folder as the CSV file.",
+                 present_at_start=False, zoom=True, pause_after_ms=1200, source_ids=["jl-notebooks"]),
+        StepSpec(id="write-code", title="Write the code to read the CSV", action="type",
+                 selector=".jp-NotebookPanel .jp-Cell .cm-content", value=CSV_CODE,
+                 expected="The three lines of code are in the first cell.",
+                 expect_js="() => document.querySelector('.jp-NotebookPanel .jp-Cell .cm-content').innerText.includes('df.head()')",
+                 narration="In the first cell, type three lines: import pandas as pd, then df equals pd.read_csv with the "
+                           "file name, and finally df.head() to show the first rows.",
+                 beginner_note="pandas is the most common Python library for working with tables of data.",
+                 present_at_start=False, timeout_ms=20000, pause_after_ms=1200, source_ids=["pandas-read-csv"]),
+        StepSpec(id="run-cell", title="Run the cell", action="click",
+                 selector='.jp-NotebookPanel-toolbar [data-command="notebook:run-cell-and-select-next"]',
+                 expected="A table with the first rows appears below the cell.", expect_js=TABLE_OUTPUT_JS, timeout_ms=45000,
+                 narration="Click Run. pandas reads the file, and the first five rows appear as a table below the code.",
+                 beginner_note="You can also press Shift and Enter to run a cell.",
+                 zoom=True, present_at_start=False, pause_after_ms=2500, source_ids=["pandas-read-csv"]),
+        StepSpec(id="save", title="Save the notebook", action="click",
+                 selector='.jp-NotebookPanel-toolbar [data-command="docmanager:save"]',
+                 expected="JupyterLab asks for a file name on the first save.", expect_selector=".jp-Dialog input",
+                 narration="Now save your work with the Save button in the notebook toolbar. Because the notebook is "
+                           "still untitled, JupyterLab asks for a name first.",
+                 zoom=True, present_at_start=False, pause_after_ms=900, source_ids=["jl-files"]),
+        StepSpec(id="type-name", title="Name the notebook", action="type", selector=".jp-Dialog input",
+                 value=CSV_NOTEBOOK, select_all_first=True, expected="The new name is entered.",
+                 expect_js=f"() => document.querySelector('.jp-Dialog input')?.value === '{CSV_NOTEBOOK}'",
+                 narration="Type a descriptive name, {csv_notebook}.",
+                 zoom=True, present_at_start=False, pause_after_ms=900, source_ids=["jl-files"]),
+        StepSpec(id="confirm-save", title="Rename and save", action="click", selector=".jp-Dialog .jp-mod-accept",
+                 expected=f"The notebook is saved as {CSV_NOTEBOOK}.",
+                 expect_js=f"() => ({CSV_NB_TAB_JS})() && ({SAVED_JS})()", timeout_ms=20000,
+                 narration="And click Rename and Save. The notebook now sits next to the CSV file in the file browser.",
+                 zoom=True, present_at_start=False, pause_after_ms=2000, source_ids=["jl-files"]),
+    ],
+)
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -138,7 +231,7 @@ class JupyterLabAdapter(AppAdapter):
         self.work: Path | None = None
 
     def workflows(self) -> dict[str, WorkflowSpec]:
-        return {FIRST_NOTEBOOK.id: FIRST_NOTEBOOK}
+        return {FIRST_NOTEBOOK.id: FIRST_NOTEBOOK, OPEN_CSV.id: OPEN_CSV}
 
     # ------------------------------------------------------------ lifecycle
     @property
@@ -156,7 +249,7 @@ class JupyterLabAdapter(AppAdapter):
         with opener.open(self.base + path, timeout=10) as r:
             return json.load(r)
 
-    def setup_environment(self, work_dir, log) -> None:
+    def setup_environment(self, work_dir, log, workflow=None) -> None:
         if not jupyterlab_available():
             raise RuntimeError("JupyterLab is not installed. Install it with: pip install 'jupyterlab>=4,<5'")
         self.work = Path(work_dir) / "jupyter"
@@ -165,6 +258,10 @@ class JupyterLabAdapter(AppAdapter):
             d.mkdir(parents=True, exist_ok=True)
         (settings / "@jupyterlab" / "apputils-extension" / "notification.jupyterlab-settings").write_text(
             json.dumps({"fetchNews": "false", "checkForUpdates": False}))
+        self.workflow_id = workflow.id if workflow else None
+        if self.workflow_id == OPEN_CSV.id:
+            (root / CSV_NAME).write_text(CSV_TEXT, encoding="utf-8")
+            log(f"Test data: wrote synthetic {CSV_NAME} ({len(CSV_ROWS) - 1} rows) into the empty test folder")
         self.port = _free_port()
         env = {**os.environ, "JUPYTERLAB_SETTINGS_DIR": str(settings), "JUPYTERLAB_WORKSPACES_DIR": str(workspaces),
                "JUPYTER_RUNTIME_DIR": str(self.work / "runtime"), "NO_PROXY": "127.0.0.1,localhost"}
@@ -227,13 +324,71 @@ class JupyterLabAdapter(AppAdapter):
         )
 
     def observe_before(self, page, workflow: WorkflowSpec) -> dict:
+        if workflow.id == OPEN_CSV.id:
+            return self._observe_csv(page)
+        return self._observe_first_notebook(page, workflow)
+
+    def verify(self, page, workflow: WorkflowSpec, observations: dict) -> list[Check]:
+        if workflow.id == OPEN_CSV.id:
+            return self._verify_csv(page, observations)
+        return self._verify_first_notebook(page, workflow, observations)
+
+    def _observe_csv(self, page) -> dict:
+        names = [c["name"] for c in self._api("/api/contents/").get("content", [])]
+        csv = self._api(f"/api/contents/{CSV_NAME}?content=1&format=text&type=file")["content"]
+        cfg = json.loads(page.locator("#jupyter-config-data").inner_text())
+        rows = [r for r in csv.strip().splitlines()]
+        return {"initial_files": names, "csv_name": CSV_NAME, "csv_rows": len(rows) - 1, "csv_notebook": CSV_NOTEBOOK,
+                "csv_columns": ", ".join(rows[0].split(",")), "csv_original": csv,
+                "app_version": cfg.get("appVersion", "")}
+
+    def _verify_csv(self, page, observations: dict) -> list[Check]:
+        checks = [Check(name="Workspace contained only the test CSV", passed=observations.get("initial_files") == [CSV_NAME],
+                        detail=str(observations.get("initial_files")))]
+        listing = [c["name"] for c in self._api("/api/contents/").get("content", [])]
+        observations["final_files"] = listing
+        csv_now = self._api(f"/api/contents/{CSV_NAME}?content=1&format=text&type=file")["content"]
+        checks.append(Check(name="CSV file unchanged", passed=csv_now == observations.get("csv_original"),
+                            detail=f"{len(csv_now)} chars"))
+        notebooks = [n for n in listing if n.endswith(".ipynb")]
+        checks.append(Check(name=f"Notebook saved as {CSV_NOTEBOOK} (no Untitled left)", passed=notebooks == [CSV_NOTEBOOK],
+                            detail=str(notebooks)))
+        if notebooks != [CSV_NOTEBOOK]:
+            return checks
+        nb = self._api(f"/api/contents/{notebooks[0]}?content=1")["content"]
+        cell = nb["cells"][0] if nb.get("cells") else {}
+        src = cell.get("source", "")
+        src = "".join(src) if isinstance(src, list) else src
+        result = next((o for o in cell.get("outputs", []) if o.get("output_type") == "execute_result"), None)
+        errors = [o for o in cell.get("outputs", []) if o.get("output_type") == "error"]
+        text = ""
+        if result:
+            t = result.get("data", {}).get("text/plain", "")
+            text = "".join(t) if isinstance(t, list) else t
+        observations["saved_output"] = text
+        header = CSV_ROWS[0]
+        shown = [r[0] for r in CSV_ROWS[1:6]]
+        hidden = [r[0] for r in CSV_ROWS[6:]]
+        checks += [
+            Check(name="Cell contains the read_csv code", passed=src.strip() == CSV_CODE, detail=src),
+            Check(name="Kernel ran the cell without errors", passed=bool(result) and not errors and cell.get("execution_count") == 1,
+                  detail=f"execution_count={cell.get('execution_count')}, errors={len(errors)}"),
+            Check(name="Output shows every CSV column", passed=all(h in text for h in header), detail=", ".join(header)),
+            Check(name="Output shows exactly the first five rows",
+                  passed=all(o in text for o in shown) and not any(o in text for o in hidden) and
+                  "html" in "".join(result.get("data", {})) if result else False,
+                  detail=f"shown {shown}; must not show {hidden}"),
+        ]
+        return checks
+
+    def _observe_first_notebook(self, page, workflow: WorkflowSpec) -> dict:
         listing = self._api("/api/contents/")
         names = [c["name"] for c in listing.get("content", [])]
         cfg = json.loads(page.locator("#jupyter-config-data").inner_text())
         return {"initial_files": names, "notebook_name": NOTEBOOK_NAME, "app_version": cfg.get("appVersion", ""),
                 "output_text": EXPECTED_OUTPUT.strip()}
 
-    def verify(self, page, workflow: WorkflowSpec, observations: dict) -> list[Check]:
+    def _verify_first_notebook(self, page, workflow: WorkflowSpec, observations: dict) -> list[Check]:
         checks = [Check(name="Workspace started empty", passed=observations.get("initial_files") == [],
                         detail=str(observations.get("initial_files")))]
         listing = [c["name"] for c in self._api("/api/contents/").get("content", [])]

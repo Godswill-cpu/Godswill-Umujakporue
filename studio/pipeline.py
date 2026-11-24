@@ -266,6 +266,9 @@ class Pipeline:
         p = self._p(pid)
         req = p["request"]
         script = self._need(p, "script")
+        wf_pron = workflow_for(req).pronunciations
+        if wf_pron:
+            req = req.model_copy(update={"pronunciations": {**wf_pron, **req.pronunciations}})
         provider = select_provider(self.settings, req, log=lambda m: self.db.log(pid, m, level="warning", stage="narrate"))
         if not provider.production_grade:
             self.db.log(pid, "Using the ROBOTIC DEVELOPMENT VOICE (explicitly enabled). Output cannot be published.",

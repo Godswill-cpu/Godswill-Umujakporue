@@ -34,3 +34,13 @@ def test_renamed_menu_command_is_detected(tmp_path):
     assert any("Control not found" in w for w in r.verification.compatibility_warnings)
     assert [s.status for s in r.steps][4:] == ["failed"] + ["skipped"] * 4
     assert no_server_left()
+
+
+def test_open_csv_workflow_verified_against_real_data(tmp_path):
+    from studio.adapters.jupyterlab import CSV_NOTEBOOK, OPEN_CSV
+    r = run_demonstration(JupyterLabAdapter(), OPEN_CSV, tmp_path, (1280, 720), log=lambda m: None)
+    v = r.verification
+    assert v.outcome == "passed", [(c.name, c.detail) for c in v.checks if not c.passed]
+    assert r.observations["final_files"] == sorted(["sales.csv", CSV_NOTEBOOK]) or set(r.observations["final_files"]) == {"sales.csv", CSV_NOTEBOOK}
+    assert "1005" in r.observations["saved_output"] and "1006" not in r.observations["saved_output"]
+    assert no_server_left()

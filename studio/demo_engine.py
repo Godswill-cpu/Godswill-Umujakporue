@@ -65,7 +65,7 @@ def run_demonstration(adapter, workflow: WorkflowSpec, project_dir: Path, viewpo
     rel = lambda p: str(Path(p).relative_to(project_dir))
 
     try:
-        adapter.setup_environment(run_dir, note)
+        adapter.setup_environment(run_dir, note, workflow)
     except Exception as e:
         note(f"Test environment could not be started: {e}")
         adapter.teardown_environment(note)
@@ -151,6 +151,8 @@ def _run(adapter, workflow, project_dir, run_dir, run_id, shots, viewport, chrom
                         page.wait_for_timeout(350)
                     if s.action == "click":
                         page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
+                    elif s.action == "dblclick":
+                        page.mouse.dblclick(cx, cy)
                     elif s.action == "check":
                         if not page.locator(s.selector).is_checked():
                             page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()

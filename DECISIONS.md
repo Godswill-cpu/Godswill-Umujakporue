@@ -81,3 +81,15 @@ unconfigured Fontconfig. Titles and captions now always use an explicit font fil
 macOS, DejaVu on Linux; `STUDIO_FONT_FILE` overrides), and the caption renderer gets `fontsdir`. File paths inside
 FFmpeg filter arguments are escaped for both parsing levels (drive-letter colons, apostrophes), verified by rendering
 through a folder named `O'Brien:test dir`. FFmpeg output is decoded as UTF-8. Settings shows a System check.
+
+## D19 — Never substitute a different tutorial for the user's topic
+Automated projects require the topic to match a tested recipe (word-level match against the recipe title). Otherwise no
+project is created; the user gets manual capture prefilled with their topic, or the closest recipes by shared words.
+
+## D20 — Pronunciations are applied in one pass
+All terms are matched in a single alternation (longest first), so a short term (`df`) is never substituted inside a
+longer one already replaced (`df.head()`). Nested `<sub>` tags had produced invalid SSML and an Azure HTTP 400. The Azure
+provider also validates SSML locally before sending. Recipes may define default pronunciations; user entries override.
+
+## D21 — Step labels
+Step labels appear lower-left above the captions for the first 4 s of each step, so they never cover content for long.

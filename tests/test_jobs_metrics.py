@@ -25,7 +25,7 @@ def test_interrupted_stages_recovered_on_startup(tmp_path):
 
 
 def test_stop_after_current_stage(client):
-    r = client.post("/create", data={"topic": "t", "workflow_id": WF, "start": "true"}, follow_redirects=False)
+    r = client.post("/create", data={"topic": "", "workflow_id": WF, "start": "true"}, follow_redirects=False)
     pid = r.headers["location"].rsplit("/", 1)[1]
     pipe = client.app_state.pipeline
     for _ in range(100):  # wait until the pipeline is inside the (slow) demonstration stage
@@ -41,7 +41,7 @@ def test_stop_after_current_stage(client):
 
 
 def test_automation_metrics_need_a_baseline(client):
-    r = client.post("/create", data={"topic": "t", "workflow_id": WF}, follow_redirects=False)
+    r = client.post("/create", data={"topic": "", "workflow_id": WF}, follow_redirects=False)
     pid = r.headers["location"].rsplit("/", 1)[1]
     db = client.app_state.db
     for _ in range(4):
