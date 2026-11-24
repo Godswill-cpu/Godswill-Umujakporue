@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Jobs{% endblock %}{% block body %}
+<h1>Production jobs</h1>
+<div class="card">{% if not rows %}<p class="muted">No running or failed stages.</p>{% else %}
+<div class="table-wrap"><table><tr><th>Project</th><th>Stage</th><th>Status</th><th>Detail</th><th></th></tr>
+{% for r in rows %}<tr><td><a href="/projects/{{ r.p.id }}">{{ r.p.title }}</a></td><td>{{ stage_labels[r.stage] }}</td>
+<td><span class="pill s-{{ r.st.status }}">{{ r.st.status }}</span></td>
+<td class="small">{% if r.st.error %}<span style="color:var(--bad)">{{ r.st.error }}</span>{% else %}<span class="muted">started {{ (r.st.started_at or '')[11:19] }} UTC</span>{% endif %}</td>
+<td>{% if r.running %}<form class="inline" method="post" action="/projects/{{ r.p.id }}/stop"><button>Stop after current stage</button></form>
+{% else %}<form class="inline" method="post" action="/projects/{{ r.p.id }}/run"><input type="hidden" name="from_stage" value="{{ r.stage }}"><button class="primary">Retry from here</button></form>{% endif %}</td></tr>{% endfor %}
+</table></div>{% endif %}</div>
+<p class="small muted">Stages run one at a time per project in a background worker. A stage interrupted by an app restart is marked failed and can be retried; completed stages are never repeated unless you ask.</p>
+{% endblock %}

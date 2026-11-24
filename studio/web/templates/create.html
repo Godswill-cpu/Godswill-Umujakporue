@@ -27,6 +27,8 @@
 <textarea id="source_urls" name="source_urls" placeholder="https://support.google.com/docs/answer/..."></textarea>
 <div class="muted small">Pages are fetched and analysed by the AI provider configured in Settings{% if not settings.llm_configured %} (<b>none configured — research will be skipped</b>){% endif %}. Every finding must quote its source verbatim; unsupported claims are discarded.</div>
 <label class="check"><input type="checkbox" name="include_tips" value="true" checked> Add sourced troubleshooting tips to the narration (flagged for your review)</label>
+<label for="manual_baseline_minutes">How long would this video take you to make by hand? (minutes, optional — used only to measure automation)</label>
+<input type="number" id="manual_baseline_minutes" name="manual_baseline_minutes" min="1" placeholder="e.g. 180">
 <label for="instructions">Additional instructions (optional)</label><textarea id="instructions" name="instructions"></textarea>
 {% if settings.mode == 'development' %}<label class="check"><input type="checkbox" name="allow_dev_tts" value="true"> Allow the robotic <b>development</b> voice if Azure is not configured (output is watermarked and can never be published)</label>{% endif %}
 {% if not settings.azure_configured %}<div class="notice warn">Azure AI Speech is not configured, so production narration will fail until you add a key in <a href="/settings">Settings</a>.</div>{% endif %}

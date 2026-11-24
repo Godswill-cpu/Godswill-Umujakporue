@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import __version__, planning, publishing
+from .. import __version__, metrics, planning, publishing
 from ..config import Settings, load_settings, save_preferences, save_secret
 from ..contracts import Approval, ProjectRequest, TutorialScript, now_iso
 from ..db import STAGES, Database
@@ -30,6 +30,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s",
                         handlers=[logging.StreamHandler(), logging.FileHandler(settings.data_dir / "studio.log")])
     db = Database(settings.db_path)
+    for pid_, stage_ in db.recover_interrupted():
+        logging.getLogger("studio").warning("Recovered interrupted stage %s of project %s", stage_, pid_)
     pipe = Pipeline(settings, db)
     app = FastAPI(title="Automated Software Tutorial Studio", version=__version__)
     app.state.settings, app.state.db, app.state.pipeline = settings, db, pipe
@@ -58,6 +60,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Project not found")
         return p
 
+    def _baseline(raw: str) -> int | None:
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        if not raw.isdigit() or not 1 <= int(raw) <= 100000:
+            raise HTTPException(400, "Manual baseline must be a whole number of minutes.")
+        return int(raw)
+
     def summarize(p: dict) -> dict:
         st = p["stages"]
         if pipe.is_running(p["id"]) or any(s["status"] == "running" for s in st.values()):
@@ -81,7 +91,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         counts = {k: sum(1 for p in projects if p["status"] == k) for k in
                   ("running", "failed", "ready for review", "approved", "in progress", "new")}
         recent = [p for p in projects if p["state"].get("render")][:5]
-        return page(request, "dashboard.html", projects=projects, counts=counts, recent=recent)
+        return page(request, "dashboard.html", projects=projects, counts=counts, recent=recent,
+                    portfolio=metrics.portfolio_metrics(db, projects))
 
     @app.get("/create", response_class=HTMLResponse)
     def create_form(request: Request, workflow: str | None = None):
@@ -96,7 +107,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                target_duration_s: int = Form(90), voice: str = Form("en-US-AndrewNeural"),
                speaking_rate: int = Form(0), difficulty: str = Form("beginner"), resolution: str = Form("1920x1080"),
                instructions: str = Form(""), allow_dev_tts: bool = Form(False), start: bool = Form(False),
-               source_urls: str = Form(""), include_tips: bool = Form(False)):
+               source_urls: str = Form(""), include_tips: bool = Form(False),
+               manual_baseline_minutes: str = Form("")):
         urls = [u.strip() for u in source_urls.splitlines() if u.strip()]
         bad = [u for u in urls if not u.startswith("https://")]
         if bad:
@@ -118,9 +130,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                              voice=voice, speaking_rate=max(-30, min(speaking_rate, 30)), difficulty=difficulty,
                              resolution=resolution, instructions=instructions,
                              allow_dev_tts=bool(allow_dev_tts) and settings.mode == "development",
-                             source_urls=urls[:8], include_tips=bool(include_tips))
+                             source_urls=urls[:8], include_tips=bool(include_tips),
+                             manual_baseline_minutes=_baseline(manual_baseline_minutes))
         pid = db.create_project(req.topic, req)
         db.log(pid, f"Project created ({req.capture_mode} capture, workflow {wf_id})")
+        db.record_intervention(pid, "create project")
         if start and req.capture_mode == "manual":
             pipe.start(pid, only=True)  # plan only; the rest waits for the upload
         elif start:
@@ -147,7 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     rel=lambda path: rel(pid, path), events=db.events(pid), running=pipe.is_running(pid),
                     voices=voices, provider_error=provider_error, provider_name=provider_name,
                     provider_prod=provider_prod, publishing_pkg=p["state"].get("publishing"),
-                    workflow=workflow_for(p["request"]), manual=p["state"].get("manual_capture") or {},
+                    workflow=workflow_for(p["request"]), m=metrics.project_metrics(db, p), manual=p["state"].get("manual_capture") or {},
                     manual_steps_text=steps_to_text(p["request"].manual_steps))
 
     @app.get("/api/projects/{pid}/status")
@@ -164,7 +178,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(400, "Unknown stage")
         if not pipe.start(pid, from_stage or None, only):
             raise HTTPException(409, "A job is already running for this project")
+        db.record_intervention(pid, f"re-run from {from_stage}" if from_stage else "run / resume pipeline")
         return RedirectResponse(f"/projects/{pid}#pipeline", status_code=303)
+
+    @app.post("/api/projects/{pid}/activity")
+    def activity(pid: str, seconds: float = Form(...)):
+        project_or_404(pid)
+        db.record_active(pid, seconds)
+        return {"ok": True}
+
+    @app.post("/projects/{pid}/baseline")
+    def set_baseline(pid: str, manual_baseline_minutes: str = Form("")):
+        p = project_or_404(pid)
+        db.update_request(pid, p["request"].model_copy(update={"manual_baseline_minutes": _baseline(manual_baseline_minutes)}))
+        return RedirectResponse(f"/projects/{pid}#metrics", status_code=303)
+
+    @app.post("/projects/{pid}/stop")
+    def stop(pid: str):
+        project_or_404(pid)
+        if not pipe.request_stop(pid):
+            raise HTTPException(409, "No job is running for this project.")
+        db.log(pid, "Stop requested: the current stage will finish, then the pipeline stops", level="warning")
+        return RedirectResponse(f"/projects/{pid}#pipeline", status_code=303)
+
+    @app.get("/jobs", response_class=HTMLResponse)
+    def jobs(request: Request):
+        rows = []
+        for p in db.list_projects():
+            for stage, st in p["stages"].items():
+                if st["status"] in ("running", "failed"):
+                    rows.append({"p": p, "stage": stage, "st": st, "running": pipe.is_running(p["id"])})
+        rows.sort(key=lambda r: (r["st"]["status"] != "running", r["st"]["started_at"] or ""), reverse=False)
+        return page(request, "jobs.html", rows=rows)
 
     @app.post("/projects/{pid}/manual-capture")
     def manual_capture(pid: str, recording: UploadFile | None = File(None), steps: str = Form(""),
@@ -186,6 +231,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 cap["video_path"] = str(dest.relative_to(pdir))
                 changed = True
                 db.log(pid, f"Manual recording uploaded: {recording.filename}", stage="demonstrate")
+            db.record_intervention(pid, "manual capture upload")
             if steps.strip():
                 new_steps = parse_steps(steps)
                 if new_steps != req.manual_steps:
@@ -207,6 +253,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise HTTPException(400, "Upload a recording and mark the steps before confirming.")
             cap["attested_at"] = now_iso()
             db.log(pid, "User attested that the manual recording shows every step succeeding", stage="demonstrate")
+            db.record_intervention(pid, "manual capture attestation")
         db.set_state(pid, "manual_capture", cap)
         if cap.get("attested_at"):
             pipe.start(pid, "plan")  # re-plan from the marked steps, then ingest and continue
@@ -231,6 +278,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             pipe.invalidate_from(pid, "narrate")
             db.set_state(pid, "script", script)
             db.log(pid, "Script edited by user; narration, render and QC must be regenerated", stage="script")
+            db.record_intervention(pid, "script edit")
         return RedirectResponse(f"/projects/{pid}#script", status_code=303)
 
     @app.post("/projects/{pid}/voice")
@@ -251,6 +299,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if db.get_stages(pid)["narrate"]["status"] == "done":
             pipe.invalidate_from(pid, "narrate")
         db.log(pid, f"Voice settings changed: {voice}, rate {req.speaking_rate:+d}%, {len(pron)} pronunciation(s)")
+        db.record_intervention(pid, "voice settings change")
         return RedirectResponse(f"/projects/{pid}#voice", status_code=303)
 
     @app.post("/projects/{pid}/voice-preview")
@@ -282,6 +331,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         approval.narration_approved_at = now_iso()
         db.set_state(pid, "approval", approval)
         db.log(pid, "Narration approved by user")
+        db.record_intervention(pid, "narration approval")
         return RedirectResponse(f"/projects/{pid}#voice", status_code=303)
 
     @app.post("/projects/{pid}/ack-version")
@@ -291,6 +341,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         approval.version_limitation_acknowledged = True
         db.set_state(pid, "approval", approval)
         db.log(pid, "User acknowledged unknown-version limitation")
+        db.record_intervention(pid, "version acknowledgement")
         return RedirectResponse(f"/projects/{pid}#qc", status_code=303)
 
     def _gate(p):
@@ -310,6 +361,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         approval.final_approved_at, approval.notes = now_iso(), notes[:1000]
         db.set_state(pid, "approval", approval)
         db.log(pid, "Final approval granted by user")
+        db.record_intervention(pid, "final approval")
         return RedirectResponse(f"/projects/{pid}#publishing", status_code=303)
 
     @app.post("/projects/{pid}/export")
@@ -330,6 +382,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pkg.export_zip = str(z.relative_to(pdir))
         db.set_state(pid, "publishing", pkg)
         db.log(pid, "Export package created (no upload performed)")
+        db.record_intervention(pid, "export")
         return RedirectResponse(f"/projects/{pid}#publishing", status_code=303)
 
     @app.get("/media/{pid}/{path:path}")

@@ -51,3 +51,15 @@ nothing ever falls back to a non-Azure voice. `sdk` or `rest` can be forced.
 ## D13 — Scene transitions
 Only the first scene fades in after the title card. Footage between steps is continuous, so per-scene fades produced
 distracting dips to black and were removed.
+
+## D14 — How automation is measured
+Human time is counted from the project page only while it is visible and the user is interacting (60 s idle
+window) or a video/audio element is playing, sent as capped heartbeats. Interventions (edits, approvals, re-runs,
+uploads, exports) are counted by type. Automation % = 1 − human time ÷ the user's own manual-production baseline,
+shown only when a baseline exists and aggregated only over approved tutorials. Time outside the app is not seen,
+so the figure can overstate automation; this limitation is shown in the UI.
+
+## D15 — Crash recovery and stopping
+Stage status lives in SQLite. On startup any stage still marked running is marked failed ("Interrupted") so it can
+be retried. Stopping is cooperative: the current stage finishes, then the pipeline stops. Killing a thread mid-stage
+(e.g. inside FFmpeg or a browser) was rejected as unsafe.

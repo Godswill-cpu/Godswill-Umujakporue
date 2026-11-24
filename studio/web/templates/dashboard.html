@@ -6,6 +6,11 @@
  <div class="stat"><span class="muted small">Approved</span><b>{{ counts['approved'] }}</b></div>
  <div class="stat"><span class="muted small">Failed</span><b style="color:var(--bad)">{{ counts['failed'] }}</b></div>
 </div>
+<div class="card"><h2>Automation (measured)</h2>
+{% if portfolio.approved_measured %}<p><b>{{ portfolio.automation_pct }}%</b> of manual production time saved across {{ portfolio.approved_measured }} approved tutorial(s):
+{{ portfolio.human_minutes }} min of your active time vs. your baseline of {{ portfolio.baseline_minutes }} min; {{ portfolio.interventions_per_video }} interventions per video.</p>
+{% else %}<p class="muted">Not measurable yet. Automation is reported only for approved tutorials where you entered how long the video would take you manually.</p>{% endif %}
+<p class="small muted">Human time = time you actively spend on a project in this app (page visible and interacting, or a video playing). Work outside the app is not counted.</p></div>
 <div class="card"><h2>Projects</h2>
 {% if not projects %}<p class="muted">No projects yet. <a href="/create">Create your first tutorial</a>.</p>{% else %}
 <div class="table-wrap"><table><tr><th>Tutorial</th><th>Status</th><th>Pipeline</th><th>Created</th></tr>

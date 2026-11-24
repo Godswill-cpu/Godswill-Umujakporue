@@ -3,7 +3,7 @@
 **Current phase:** Phases 1–3 complete for the supported workflow; the §14 acceptance test has **passed live** (see below). Phase 4 partly done.
 Azure Neural TTS run (no credentials available in the development environment).
 
-Test suite: `pytest -q` → **41 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
+Test suite: `pytest -q` → **44 passed** (incl. 1 live Azure test when credentials are set) (real Chromium + real FFmpeg; dev voice for narration).
 
 ## Live acceptance test (§14) — PASSED 2026-11-24
 `scripts/acceptance_run.py` drives the real dashboard in Chromium with the app in **production mode** (no dev voice
@@ -43,6 +43,9 @@ Caveats, stated plainly:
 | Research-assisted planning: fetches real documentation (https only, size limits), extracts text, asks the LLM for findings with verbatim quotes, **keeps only findings whose quote is found in the fetched source**, reports discarded claims, discrepancies with the tested workflow and uncertain statements; cached; per-project token budget | `test_research` (labeled fake LLM + real fetch of an official Google help page) |
 | Sourced troubleshooting tips in narration (by difficulty), shown over the verified final state, flagged for human review in QC | `test_research` |
 | Azure Neural TTS (live, eastus): SSML, voices, rate, pronunciations, REST transport, auth/400 errors, auto-switch from SDK when it cannot connect | `test_publishing_azure` (live), acceptance run |
+| Job management: Jobs page, stop-after-current-stage, retry, stages interrupted by a crash/restart marked failed on startup | `test_jobs_metrics` |
+| Automation measurement: active human time (visible page + interaction or media playing), intervention counts by type, machine time, automation % only against the user's own manual baseline and only for approved projects | `test_jobs_metrics` |
+| One-command install/start (`install.sh`/`start.sh`; `install.ps1`/`start.bat` for Windows) | install.sh + start.sh run from a clean copy; Windows scripts **not run** (no Windows host) |
 | Resumable stages ("Run from here"), background jobs, activity log | e2e |
 
 ## Implemented, NOT tested live
@@ -61,7 +64,7 @@ Caveats, stated plainly:
 - Automatic documentation discovery (web search) and LLM-assisted script polishing.
 - Additional adapters (Google Sheets with test account first); desktop automation adapters.
 - Optional authorized YouTube upload.
-- Automation-time measurement (needed before any claim about the 85% target).
+- Real automation evidence: measurement is implemented, but no real tutorial has been produced by a user with a baseline yet, so **no automation percentage can be claimed**.
 
 ## Known limitations
 - The only supported application is the bundled **Studio Sandbox Sheet** test app, not a third-party product.

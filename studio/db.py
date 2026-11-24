@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS events (
     stage TEXT,
     message TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    kind TEXT NOT NULL,          -- 'active' (seconds of human attention) | 'intervention'
+    seconds REAL NOT NULL DEFAULT 0,
+    detail TEXT
+);
 CREATE TABLE IF NOT EXISTS usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id TEXT NOT NULL,
@@ -139,6 +147,29 @@ class Database:
     def events(self, pid: str, limit: int = 200) -> list[dict]:
         rows = self._query("SELECT * FROM events WHERE project_id=? ORDER BY id DESC LIMIT ?", (pid, limit))
         return [dict(r) for r in rows]
+
+    # human activity (automation measurement) --------------------------------
+    def record_active(self, pid: str, seconds: float) -> None:
+        self._exec("INSERT INTO activity (project_id, ts, kind, seconds) VALUES (?,?,?,?)",
+                   (pid, now_iso(), "active", max(0.0, min(seconds, 60.0))))
+
+    def record_intervention(self, pid: str, detail: str) -> None:
+        self._exec("INSERT INTO activity (project_id, ts, kind, seconds, detail) VALUES (?,?,?,?,?)",
+                   (pid, now_iso(), "intervention", 0, detail))
+
+    def activity(self, pid: str) -> dict:
+        active = self._query("SELECT COALESCE(SUM(seconds),0) AS s FROM activity WHERE project_id=? AND kind='active'", (pid,))
+        inter = self._query("SELECT detail, COUNT(*) AS n FROM activity WHERE project_id=? AND kind='intervention' "
+                            "GROUP BY detail ORDER BY n DESC", (pid,))
+        return {"active_seconds": float(active[0]["s"]), "interventions": {r["detail"]: r["n"] for r in inter}}
+
+    def recover_interrupted(self) -> list[tuple[str, str]]:
+        """Stages left 'running' by a crash/restart are marked failed so they can be retried."""
+        rows = self._query("SELECT project_id, stage FROM stages WHERE status='running'")
+        for r in rows:
+            self.set_stage(r["project_id"], r["stage"], "failed", "Interrupted: the app stopped while this stage was running. Retry it.")
+            self.log(r["project_id"], f"Stage '{r['stage']}' was interrupted by an app restart", level="warning", stage=r["stage"])
+        return [(r["project_id"], r["stage"]) for r in rows]
 
     # usage -----------------------------------------------------------------
     def record_usage(self, pid: str, provider: str, characters: int, cached: bool) -> None:

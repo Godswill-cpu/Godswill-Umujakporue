@@ -47,6 +47,8 @@ class ProjectRequest(BaseModel):
     # Documentation pages to research (fetched for real; claims must quote them verbatim).
     source_urls: list[str] = Field(default_factory=list)
     include_tips: bool = True
+    # How long this tutorial would take the user to make by hand (their own estimate); enables automation %.
+    manual_baseline_minutes: int | None = None
 
     @property
     def size(self) -> tuple[int, int]:

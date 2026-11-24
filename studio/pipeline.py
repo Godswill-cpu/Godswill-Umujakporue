@@ -43,6 +43,7 @@ class Pipeline:
         self.db = db
         self._threads: dict[str, threading.Thread] = {}
         self._lock = threading.Lock()
+        self._stop_requested: set[str] = set()
         from .llm import select_llm
         from .research.sources import fetch
         self.llm_factory = select_llm  # replaceable in tests (labeled fakes only)
@@ -66,6 +67,13 @@ class Pipeline:
             self._threads[pid] = t
             t.start()
             return True
+
+    def request_stop(self, pid: str) -> bool:
+        """Cooperative stop: the current stage finishes, no further stage starts."""
+        if not self.is_running(pid):
+            return False
+        self._stop_requested.add(pid)
+        return True
 
     def wait(self, pid: str, timeout: float | None = None) -> None:
         t = self._threads.get(pid)
@@ -96,7 +104,12 @@ class Pipeline:
         if from_stage:
             self.invalidate_from(pid, from_stage)
         todo = [start] if only else STAGES[STAGES.index(start):]
+        self._stop_requested.discard(pid)
         for stage in todo:
+            if pid in self._stop_requested:
+                self._stop_requested.discard(pid)
+                self.db.log(pid, f"Stopped by user before stage '{stage}'", level="warning", stage=stage)
+                return
             self.db.set_stage(pid, stage, "running")
             self.db.log(pid, f"Stage '{stage}' started", stage=stage)
             try:

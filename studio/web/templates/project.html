@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}{{ p.title }}{% endblock %}{% block body %}
 <h1>{{ p.title }} <span class="pill s-{{ p.status.replace(' ','.') }}" id="proj-status">{{ p.status }}</span></h1>
 <div class="toc"><a href="#pipeline">Pipeline</a><a href="#planning">Research & planning</a><a href="#demo">Demonstration</a><a href="#script">Script editor</a>
-<a href="#voice">Voice studio</a><a href="#review">Video review</a><a href="#qc">Quality control</a><a href="#publishing">Publishing</a><a href="#log">Log</a></div>
+<a href="#voice">Voice studio</a><a href="#review">Video review</a><a href="#qc">Quality control</a><a href="#publishing">Publishing</a><a href="#metrics">Automation</a><a href="#log">Log</a></div>
 
 <section class="card" id="pipeline"><h2>Pipeline</h2>
 <table><tr><th>Stage</th><th>Status</th><th>Detail</th><th></th></tr>
@@ -9,7 +9,8 @@
 <td class="small">{% if st.error %}<span style="color:var(--bad)">{{ st.error }}</span>{% elif st.finished_at %}<span class="muted">{{ st.finished_at[11:19] }} UTC</span>{% endif %}</td>
 <td><form class="inline" method="post" action="/projects/{{ p.id }}/run"><input type="hidden" name="from_stage" value="{{ s }}">
 <button {{ 'disabled' if running }} title="Re-run this stage and everything after it">Run from here</button></form></td></tr>{% endfor %}</table>
-<form method="post" action="/projects/{{ p.id }}/run" style="margin-top:12px"><button class="primary" {{ 'disabled' if running }}>{{ 'Running…' if running else 'Run / resume pipeline' }}</button></form>
+<div style="margin-top:12px"><form class="inline" method="post" action="/projects/{{ p.id }}/run"><button class="primary" {{ 'disabled' if running }}>{{ 'Running…' if running else 'Run / resume pipeline' }}</button></form>
+{% if running %} <form class="inline" method="post" action="/projects/{{ p.id }}/stop"><button>Stop after current stage</button></form>{% endif %}</div>
 </section>
 
 <section class="card" id="planning"><h2>Research & planning</h2>
@@ -132,9 +133,25 @@
 <label for="notes">Notes</label><input type="text" id="notes" name="notes"><p><button class="primary">Grant final approval</button></p></form>{% endif %}
 </section>
 
+<section class="card" id="metrics"><h2>Automation measurement</h2>
+<table class="small"><tr><th>Your active time</th><td>{{ m.human_minutes }} min</td><th>Machine time</th><td>{{ m.machine_minutes }} min</td></tr>
+<tr><th>Interventions</th><td colspan="3">{{ m.intervention_count }}{% if m.interventions %} — {% for k, v in m.interventions.items() %}{{ k }} ×{{ v }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</td></tr>
+<tr><th>Automation</th><td colspan="3">{% if m.automation_pct is not none %}<b>{{ m.automation_pct }}%</b> of your {{ m.baseline_minutes }}-minute manual baseline saved{% if not m.approved %} (provisional until final approval){% endif %}{% else %}<span class="muted">not measurable — enter your manual baseline</span>{% endif %}</td></tr></table>
+<form method="post" action="/projects/{{ p.id }}/baseline" class="row" style="align-items:end"><div><label for="baseline">Manual baseline (minutes)</label>
+<input type="number" min="1" id="baseline" name="manual_baseline_minutes" value="{{ p.request.manual_baseline_minutes or '' }}"></div><div><button>Save baseline</button></div></form>
+</section>
+
 <section class="card" id="log"><h2>Activity log</h2><pre id="events">{% for e in events %}{{ e.ts[11:19] }} {{ e.level.upper() }} {{ e.stage or '' }} {{ e.message }}
 {% endfor %}</pre></section>
 <script>
+// Automation measurement: count time only while the page is visible and the user interacts or a video plays.
+(function(){let last=Date.now(), acc=0, prev=Date.now();
+ ['mousemove','keydown','scroll','click','touchstart'].forEach(e=>document.addEventListener(e,()=>{last=Date.now();},{passive:true}));
+ const playing=()=>[...document.querySelectorAll('video,audio')].some(m=>!m.paused&&!m.ended);
+ setInterval(()=>{const now=Date.now(), dt=(now-prev)/1000; prev=now;
+  if(document.visibilityState==='visible' && (now-last<60000 || playing())) acc+=dt;
+  if(acc>=15){const fd=new FormData(); fd.append('seconds', acc.toFixed(1)); acc=0;
+   fetch('/api/projects/{{ p.id }}/activity',{method:'POST',body:fd,keepalive:true}).catch(()=>{});}},5000);})();
 function seek(t){const v=document.getElementById('final-video'); if(v){v.currentTime=t; v.play();}}
 async function preview(){const m=document.getElementById('preview-msg'); m.textContent='Generating…';
  const fd=new FormData(); fd.append('text', document.getElementById('preview-text').value);

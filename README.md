@@ -17,6 +17,10 @@ with captions, runs quality control and — only after your approval — exports
 - Azure AI Speech resource (key + region) for production narration
 
 ## Install
+**Easiest:** macOS/Linux `./install.sh` then `./start.sh`; Windows: right-click `install.ps1` → *Run with PowerShell*,
+then double-click `start.bat`. The browser opens at http://127.0.0.1:8765.
+
+Manual install:
 ```bash
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -54,6 +58,11 @@ is identical; the video is labelled as human-verified rather than automatically 
 In development mode a project can explicitly opt in to a **robotic offline voice** (FFmpeg libflite) to test
 the pipeline. Such videos are watermarked "DEVELOPMENT VOICE – NOT FOR PUBLICATION" and can never be approved or
 exported. Production mode (`STUDIO_MODE=production`) never uses it.
+
+## Measuring automation
+Enter on *Create video* (or later on the project page) how many minutes the tutorial would take you by hand.
+The app counts your active time and interventions per project and, after final approval, reports the share of
+your baseline saved on the dashboard. Nothing is estimated without your baseline.
 
 ## Configuration
 Environment variables (or `.env`) override Settings-page values:

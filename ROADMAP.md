@@ -32,3 +32,8 @@ entirely through the UI.
 ## After Phase 4
 Additional adapters (Google Sheets with a dedicated test account first), desktop automation adapters,
 automation-time measurement to evidence (or refute) the 85% target.
+
+## Progress (2026-11-24)
+- Phase 1 ✅ · Phase 2 ✅ (sandbox adapter + manual capture) · Phase 3 ✅ for the supported workflow (live Azure; LLM research untested live)
+- Phase 4: job management ✅, crash recovery ✅, approval/export ✅, automation measurement ✅, installers ✅ (Windows untested),
+  YouTube upload ⏳ (needs Google OAuth credentials + explicit authorization), Google Sheets adapter ⏳ (needs test account)
